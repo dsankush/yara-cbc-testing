@@ -1,943 +1,1251 @@
-/* ===== CSS Reset and Base Styles ===== */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-:root {
-    /* Yara Brand Colors */
-    --primary-color: #00695f;
-    --secondary-color: #4db6ac;
-    --accent-color: #ffb300;
-    --success-color: #4caf50;
-    --warning-color: #ff9800;
-    --danger-color: #f44336;
-    --info-color: #2196f3;
-    
-    /* Neutral Colors */
-    --text-primary: #212121;
-    --text-secondary: #757575;
-    --bg-primary: #f5f7fa;
-    --bg-secondary: #ffffff;
-    --border-color: #e0e0e0;
-    
-    /* Shadows */
-    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.08);
-    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
-    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
-    
-    /* Spacing */
-    --spacing-xs: 0.5rem;
-    --spacing-sm: 1rem;
-    --spacing-md: 1.5rem;
-    --spacing-lg: 2rem;
-    --spacing-xl: 3rem;
-    
-    /* Border Radius */
-    --radius-sm: 4px;
-    --radius-md: 8px;
-    --radius-lg: 12px;
-    --radius-xl: 16px;
-}
-
-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: var(--bg-primary);
-    color: var(--text-primary);
-    line-height: 1.6;
-    overflow-x: hidden;
-}
-
-.container {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 0 var(--spacing-md);
-}
-
-/* ===== Header Styles ===== */
-.dashboard-header {
-    background: linear-gradient(135deg, var(--primary-color) 0%, #004d40 100%);
-    color: white;
-    padding: var(--spacing-md) 0;
-    box-shadow: var(--shadow-md);
-    position: sticky;
-    top: 0;
-    z-index: 1000;
-}
-
-.header-content {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: var(--spacing-md);
-}
-
-.logo-section {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-md);
-}
-
-.logo {
-    height: 60px;
-    width: auto;
-    background: white;
-    padding: var(--spacing-xs);
-    border-radius: var(--radius-md);
-}
-
-.header-text h1 {
-    font-size: 1.8rem;
-    font-weight: 700;
-    margin-bottom: 0.25rem;
-}
-
-.subtitle {
-    font-size: 0.9rem;
-    opacity: 0.9;
-    font-weight: 300;
-}
-
-.header-actions {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-md);
-}
-
-.btn-primary {
-    background-color: var(--accent-color);
-    color: var(--text-primary);
-    border: none;
-    padding: 0.75rem 1.5rem;
-    border-radius: var(--radius-md);
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-    transition: all 0.3s ease;
-    box-shadow: var(--shadow-sm);
-}
-
-.btn-primary:hover {
-    background-color: #ffa000;
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
-}
-
-.btn-primary i {
-    font-size: 1rem;
-}
-
-.last-updated {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-    font-size: 0.85rem;
-    opacity: 0.9;
-}
-
-/* ===== Controls Section ===== */
-.controls-section {
-    background: var(--bg-secondary);
-    padding: var(--spacing-lg) 0;
-    box-shadow: var(--shadow-sm);
-    margin-bottom: var(--spacing-lg);
-}
-
-.search-container {
-    position: relative;
-    margin-bottom: var(--spacing-md);
-}
-
-.search-container i.fa-search {
-    position: absolute;
-    left: 1rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--text-secondary);
-    font-size: 1.2rem;
-}
-
-#universalSearch {
-    width: 100%;
-    padding: 1rem 3rem 1rem 3rem;
-    border: 2px solid var(--border-color);
-    border-radius: var(--radius-lg);
-    font-size: 1rem;
-    transition: all 0.3s ease;
-}
-
-#universalSearch:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(0, 105, 95, 0.1);
-}
-
-.clear-search {
-    position: absolute;
-    right: 1rem;
-    top: 50%;
-    transform: translateY(-50%);
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    cursor: pointer;
-    font-size: 1.2rem;
-    padding: 0.5rem;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-.clear-search.visible {
-    opacity: 1;
-}
-
-.clear-search:hover {
-    color: var(--danger-color);
-}
-
-.filters-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: var(--spacing-md);
-    align-items: end;
-}
-
-.filter-group {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-xs);
-}
-
-.filter-group label {
-    font-weight: 600;
-    font-size: 0.9rem;
-    color: var(--text-secondary);
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-}
-
-.filter-group label i {
-    color: var(--primary-color);
-}
-
-.filter-select,
-.filter-input {
-    padding: 0.75rem;
-    border: 2px solid var(--border-color);
-    border-radius: var(--radius-md);
-    font-size: 0.95rem;
-    transition: all 0.3s ease;
-    background-color: white;
-}
-
-.filter-select:focus,
-.filter-input:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(0, 105, 95, 0.1);
-}
-
-.date-range-inputs {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-}
-
-.date-separator {
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-}
-
-.filter-input-hidden {
-    display: none;
-}
-
-#dateRangeFilter {
-    cursor: pointer;
-    background-color: white;
-}
-
-#dateRangeFilter:hover {
-    border-color: var(--primary-color);
-}
-
-.btn-secondary {
-    background-color: var(--text-secondary);
-    color: white;
-    border: none;
-    padding: 0.75rem 1.5rem;
-    border-radius: var(--radius-md);
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--spacing-xs);
-    transition: all 0.3s ease;
-}
-
-.btn-secondary:hover {
-    background-color: var(--text-primary);
-    transform: translateY(-2px);
-}
-
-/* ===== Main Dashboard ===== */
-.dashboard-main {
-    padding: var(--spacing-lg) 0;
-}
-
-/* ===== Metrics Cards ===== */
-.metrics-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: var(--spacing-md);
-    margin-bottom: var(--spacing-lg);
-}
-
-.metric-card {
-    background: var(--bg-secondary);
-    border-radius: var(--radius-lg);
-    padding: var(--spacing-md);
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-md);
-    box-shadow: var(--shadow-md);
-    transition: all 0.3s ease;
-    position: relative;
-    overflow: hidden;
-}
-
-.metric-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
-}
-
-.metric-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-lg);
-}
-
-.metric-card.highlight {
-    background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
-    border: 2px solid var(--info-color);
-}
-
-.metric-icon {
-    width: 60px;
-    height: 60px;
-    border-radius: var(--radius-lg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.8rem;
-    color: white;
-    flex-shrink: 0;
-}
-
-.metric-icon.blue { background: linear-gradient(135deg, #2196f3, #1976d2); }
-.metric-icon.green { background: linear-gradient(135deg, #00897b, #00695f); }
-.metric-icon.yellow { background: linear-gradient(135deg, #ffa726, #ff9800); }
-.metric-icon.success { background: linear-gradient(135deg, #66bb6a, #4caf50); }
-.metric-icon.red { background: linear-gradient(135deg, #ef5350, #f44336); }
-.metric-icon.purple { background: linear-gradient(135deg, #ab47bc, #9c27b0); }
-.metric-icon.orange { background: linear-gradient(135deg, #ff7043, #ff5722); }
-.metric-icon.teal { background: linear-gradient(135deg, #26a69a, #00897b); }
-
-.metric-content h3 {
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin-bottom: 0.25rem;
-}
-
-.metric-content p {
-    font-size: 0.95rem;
-    color: var(--text-secondary);
-    font-weight: 500;
-}
-
-.metric-content small {
-    display: block;
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    margin-top: 0.25rem;
-}
-
-/* ===== Charts Section ===== */
-.charts-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
-    gap: var(--spacing-lg);
-    margin-bottom: var(--spacing-lg);
-}
-
-.chart-card {
-    background: var(--bg-secondary);
-    border-radius: var(--radius-lg);
-    padding: var(--spacing-lg);
-    box-shadow: var(--shadow-md);
-    transition: all 0.3s ease;
-}
-
-.chart-card:hover {
-    box-shadow: var(--shadow-lg);
-}
-
-.chart-card.full-width {
-    grid-column: 1 / -1;
-}
-
-.chart-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: var(--spacing-md);
-    padding-bottom: var(--spacing-sm);
-    border-bottom: 2px solid var(--border-color);
-}
-
-.chart-header h3 {
-    font-size: 1.2rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-}
-
-.chart-header h3 i {
-    color: var(--primary-color);
-}
-
-.chart-container {
-    position: relative;
-    height: 350px;
-}
-
-/* ===== Budget Tracking ===== */
-.budget-grid {
-    display: grid;
-    gap: var(--spacing-md);
-}
-
-.budget-item {
-    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
-    border-radius: var(--radius-md);
-    padding: var(--spacing-md);
-    border-left: 4px solid var(--primary-color);
-}
-
-.budget-product-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: var(--spacing-sm);
-}
-
-.budget-product-header h4 {
-    font-size: 1.1rem;
-    color: var(--text-primary);
-    font-weight: 600;
-}
-
-.budget-remaining {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--success-color);
-}
-
-.budget-bar {
-    height: 12px;
-    background-color: #e0e0e0;
-    border-radius: 6px;
-    overflow: hidden;
-    margin-bottom: var(--spacing-sm);
-}
-
-.budget-consumed {
-    height: 100%;
-    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
-    transition: width 0.5s ease;
-    border-radius: 6px;
-}
-
-.budget-stats {
-    display: flex;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: var(--spacing-sm);
-    font-size: 0.9rem;
-    color: var(--text-secondary);
-}
-
-.budget-stats span {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-}
-
-.budget-stats strong {
-    color: var(--text-primary);
-}
-
-.budget-stats i {
-    color: var(--primary-color);
-}
-
-/* ===== Retailers Table ===== */
-.table-container {
-    overflow-x: auto;
-    border-radius: var(--radius-md);
-}
-
-.retailers-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.95rem;
-}
-
-.retailers-table thead {
-    background: linear-gradient(135deg, var(--primary-color), #004d40);
-    color: white;
-}
-
-.retailers-table th {
-    padding: 1rem;
-    text-align: left;
-    font-weight: 600;
-    white-space: nowrap;
-}
-
-.retailers-table tbody tr {
-    border-bottom: 1px solid var(--border-color);
-    transition: background-color 0.2s ease;
-}
-
-.retailers-table tbody tr:hover {
-    background-color: #f5f7fa;
-}
-
-.retailers-table td {
-    padding: 1rem;
-    color: var(--text-primary);
-}
-
-.retailers-table td:first-child {
-    font-weight: 700;
-    font-size: 1.1rem;
-}
-
-.retailers-table .medal {
-    display: inline-block;
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    text-align: center;
-    line-height: 30px;
-    font-weight: 700;
-    color: white;
-}
-
-.retailers-table .rank-1 { background: linear-gradient(135deg, #ffd700, #ffed4e); color: #000; }
-.retailers-table .rank-2 { background: linear-gradient(135deg, #c0c0c0, #e8e8e8); color: #000; }
-.retailers-table .rank-3 { background: linear-gradient(135deg, #cd7f32, #e89a5c); color: #fff; }
-
-.no-data {
-    text-align: center;
-    padding: 2rem !important;
-    color: var(--text-secondary);
-    font-style: italic;
-}
-
-/* ===== Map Legend ===== */
-.map-legend {
-    display: flex;
-    gap: var(--spacing-md);
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-}
-
-.map-legend span {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-}
-
-.map-legend i {
-    font-size: 0.7rem;
-}
-
-/* ===== India Map ===== */
-#indiaMap {
-    width: 100%;
-    height: 600px;
-    border-radius: var(--radius-md);
-    z-index: 1;
-}
-
-.leaflet-popup-content-wrapper {
-    border-radius: var(--radius-md);
-}
-
-.leaflet-popup-content h4 {
-    color: var(--primary-color);
-    margin-bottom: var(--spacing-xs);
-}
-
-/* ===== Map Visualization ===== */
-.map-container {
-    padding: var(--spacing-md) 0;
-}
-
-.map-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: var(--spacing-md);
-}
-
-.district-item {
-    background: linear-gradient(135deg, #ffffff, #f8f9fa);
-    border: 2px solid var(--border-color);
-    border-radius: var(--radius-md);
-    padding: var(--spacing-md);
-    text-align: center;
-    transition: all 0.3s ease;
-    cursor: pointer;
-}
-
-.district-item:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-md);
-    border-color: var(--primary-color);
-}
-
-.district-item.active {
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-    color: white;
-    border-color: var(--primary-color);
-}
-
-.district-item h4 {
-    font-size: 1rem;
-    margin-bottom: var(--spacing-xs);
-    font-weight: 600;
-}
-
-.district-item .district-stats {
-    font-size: 0.85rem;
-    opacity: 0.9;
-}
-
-.district-item .district-winners {
-    font-size: 1.5rem;
-    font-weight: 700;
-    margin: var(--spacing-xs) 0;
-}
-
-.district-item .district-total {
-    font-size: 0.8rem;
-    opacity: 0.8;
-}
-
-/* ===== Footer ===== */
-.dashboard-footer {
-    background: linear-gradient(135deg, var(--primary-color) 0%, #004d40 100%);
-    color: white;
-    padding: var(--spacing-md) 0;
-    text-align: center;
-    margin-top: var(--spacing-xl);
-}
-
-.dashboard-footer p {
-    font-size: 0.9rem;
-    opacity: 0.9;
-}
-
-/* ===== Loading Overlay ===== */
-.loading-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.8);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-    transition: opacity 0.3s ease;
-}
-
-.loading-overlay.hidden {
-    opacity: 0;
-    pointer-events: none;
-}
-
-.loader {
-    text-align: center;
-    color: white;
-}
-
-.loader i {
-    font-size: 4rem;
-    margin-bottom: var(--spacing-md);
-}
-
-.loader p {
-    font-size: 1.2rem;
-    font-weight: 600;
-}
-
-/* ===== Responsive Design ===== */
-@media (max-width: 1200px) {
-    .charts-row {
-        grid-template-columns: 1fr;
+// ===== Global Variables =====
+let allData = [];
+let filteredData = [];
+let charts = {};
+let indiaMapInstance = null;
+let mapMarkers = [];
+
+// Product configuration with pricing and cashback info
+const PRODUCT_CONFIG = {
+    'YaraMila Complex': {
+        packSize: '25kg',
+        price: 2400,
+        cashback: 40,
+        budget: 75000
+    },
+    'YaraLiva Nitrabor': {
+        packSize: '25kg',
+        price: 1600,
+        cashback: 25,
+        budget: 50000
+    },
+    'YaraVita Seniphos': {
+        packSize: '500ml',
+        price: 850,
+        cashback: 20,
+        budget: 35000
+    },
+    'YaraVita Bortrac': {
+        packSize: '250ml',
+        price: 500,
+        cashback: 10,
+        budget: 15000
+    },
+    'YaraVita Zintrac 700': {
+        packSize: '250ml',
+        price: 450,
+        cashback: 10,
+        budget: 25000
     }
-}
+};
 
-@media (max-width: 768px) {
-    .header-content {
-        flex-direction: column;
-        align-items: flex-start;
+const CASHBACK_THRESHOLD = 10000;
+
+// Approximate coordinates for Uttar Pradesh districts
+const UP_DISTRICTS_COORDS = {
+    'Agra': [27.1767, 78.0081],
+    'Aligarh': [27.8974, 78.0880],
+    'Amroha': [28.9034, 78.4671],
+    'Moradabad': [28.8389, 78.7378],
+    'Bareilly': [28.3670, 79.4304],
+    'Meerut': [28.9845, 77.7064],
+    'Ghaziabad': [28.6692, 77.4538],
+    'Bulandshahr': [28.4055, 77.8483],
+    'Gautam Buddha Nagar': [28.3587, 77.5349],
+    'Noida': [28.3587, 77.5349]
+};
+
+// ===== Utility Functions =====
+function parseCSV(csvText) {
+    const lines = csvText.trim().split('\n');
+    const headers = lines[0].split(',').map(h => h.trim());
+    const data = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+        let currentLine = lines[i];
+        let row = [];
+        let inQuotes = false;
+        let currentField = '';
+        
+        for (let j = 0; j < currentLine.length; j++) {
+            const char = currentLine[j];
+            
+            if (char === '"') {
+                inQuotes = !inQuotes;
+            } else if (char === ',' && !inQuotes) {
+                row.push(currentField.trim());
+                currentField = '';
+            } else {
+                currentField += char;
+            }
+        }
+        row.push(currentField.trim());
+        
+        // If we're in quotes at end of line, continue to next line
+        while (inQuotes && i + 1 < lines.length) {
+            i++;
+            currentLine = lines[i];
+            currentField += '\n';
+            
+            for (let j = 0; j < currentLine.length; j++) {
+                const char = currentLine[j];
+                
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    row.push(currentField.trim());
+                    currentField = '';
+                } else {
+                    currentField += char;
+                }
+            }
+            row.push(currentField.trim());
+        }
+        
+        if (row.length > 1 && row.some(field => field !== '')) {
+            const rowData = {};
+            headers.forEach((header, index) => {
+                rowData[header] = row[index] || '';
+            });
+            data.push(rowData);
+        }
     }
     
-    .header-text h1 {
-        font-size: 1.4rem;
+    return data;
+}
+
+function extractProductName(productString) {
+    if (!productString) return '';
+    
+    // Remove quotes and extract product name before "Cashback Amount"
+    const cleanString = productString.replace(/^["']|["']$/g, '').trim();
+    const match = cleanString.match(/^(.*?)\s*(?:Cashback Amount|$)/i);
+    return match ? match[1].trim() : cleanString;
+}
+
+function extractCashbackAmount(productString) {
+    if (!productString) return 0;
+    
+    // Extract cashback amount from the string like "YaraLiva Nitrabor \n Cashback Amount : ₹25"
+    const match = productString.match(/Cashback Amount\s*[:：]\s*₹?(\d+)/i);
+    return match ? parseInt(match[1]) : 0;
+}
+
+function parseDate(dateString) {
+    if (!dateString) return null;
+    
+    // Handle DD-MM-YYYY format
+    const parts = dateString.split(/[\s-]/);
+    if (parts.length >= 3) {
+        const day = parseInt(parts[0]);
+        const month = parseInt(parts[1]) - 1;
+        const year = parseInt(parts[2]);
+        return new Date(year, month, day);
     }
     
-    .metrics-row {
-        grid-template-columns: 1fr;
+    return new Date(dateString);
+}
+
+function formatCurrency(amount) {
+    return '₹' + Math.round(amount).toLocaleString('en-IN');
+}
+
+function formatNumber(num) {
+    return Math.round(num).toLocaleString('en-IN');
+}
+
+// ===== Data Processing Functions =====
+function calculateOrderValue(order) {
+    let totalValue = 0;
+    
+    for (let i = 1; i <= 5; i++) {
+        const productString = order[`Product Name ${i}`];
+        const quantity = parseInt(order[`Product Quantity ${i}`]) || 0;
+        
+        if (productString && quantity > 0) {
+            const productName = extractProductName(productString);
+            
+            if (PRODUCT_CONFIG[productName]) {
+                totalValue += PRODUCT_CONFIG[productName].price * quantity;
+            }
+        }
     }
     
-    .filters-container {
-        grid-template-columns: 1fr;
+    return totalValue;
+}
+
+function calculateFarmerTotals() {
+    const farmerTotals = {};
+    
+    // First pass: calculate total verified value per farmer
+    filteredData.forEach(order => {
+        const farmerMobile = order['Farmer Mobile'];
+        const isVerified = order['Approval Status']?.trim() === 'Verified';
+        
+        if (!farmerMobile) return;
+        
+        if (!farmerTotals[farmerMobile]) {
+            farmerTotals[farmerMobile] = {
+                totalValue: 0,
+                verifiedValue: 0,
+                orders: [],
+                verifiedOrders: 0
+            };
+        }
+        
+        const orderValue = calculateOrderValue(order);
+        farmerTotals[farmerMobile].totalValue += orderValue;
+        farmerTotals[farmerMobile].orders.push(order);
+        
+        if (isVerified) {
+            farmerTotals[farmerMobile].verifiedValue += orderValue;
+            farmerTotals[farmerMobile].verifiedOrders++;
+        }
+    });
+    
+    return farmerTotals;
+}
+
+function calculateOrderCashback(order, farmerVerifiedTotal) {
+    // Only eligible if farmer's total verified value >= 10000 and this order status is Verified
+    const isVerified = order['Approval Status']?.trim() === 'Verified';
+    
+    if (farmerVerifiedTotal < CASHBACK_THRESHOLD || !isVerified) {
+        return 0;
     }
     
-    .metric-card {
-        padding: var(--spacing-sm);
+    let totalCashback = 0;
+    
+    for (let i = 1; i <= 5; i++) {
+        const productString = order[`Product Name ${i}`];
+        const quantity = parseInt(order[`Product Quantity ${i}`]) || 0;
+        
+        if (productString && quantity > 0) {
+            // Try to extract cashback from the product string first
+            let cashbackPerUnit = extractCashbackAmount(productString);
+            
+            // Fallback to product config if not found in string
+            if (cashbackPerUnit === 0) {
+                const productName = extractProductName(productString);
+                if (PRODUCT_CONFIG[productName]) {
+                    cashbackPerUnit = PRODUCT_CONFIG[productName].cashback;
+                }
+            }
+            
+            totalCashback += cashbackPerUnit * quantity;
+        }
     }
     
-    .metric-icon {
-        width: 50px;
-        height: 50px;
-        font-size: 1.5rem;
+    return totalCashback;
+}
+
+function getProductSales() {
+    const sales = {};
+    
+    Object.keys(PRODUCT_CONFIG).forEach(product => {
+        sales[product] = { units: 0, cashback: 0, orders: 0 };
+    });
+    
+    const farmerTotals = calculateFarmerTotals();
+    
+    filteredData.forEach(order => {
+        const farmerMobile = order['Farmer Mobile'];
+        const farmerVerifiedTotal = farmerTotals[farmerMobile]?.verifiedValue || 0;
+        const orderCashback = calculateOrderCashback(order, farmerVerifiedTotal);
+        
+        for (let i = 1; i <= 5; i++) {
+            const productString = order[`Product Name ${i}`];
+            const quantity = parseInt(order[`Product Quantity ${i}`]) || 0;
+            
+            if (productString && quantity > 0) {
+                const productName = extractProductName(productString);
+                
+                if (productName && sales[productName]) {
+                    sales[productName].units += quantity;
+                    sales[productName].orders++;
+                    
+                    if (orderCashback > 0) {
+                        // Get cashback for this specific product in this order
+                        let cashbackPerUnit = extractCashbackAmount(productString);
+                        if (cashbackPerUnit === 0 && PRODUCT_CONFIG[productName]) {
+                            cashbackPerUnit = PRODUCT_CONFIG[productName].cashback;
+                        }
+                        sales[productName].cashback += cashbackPerUnit * quantity;
+                    }
+                }
+            }
+        }
+    });
+    
+    return sales;
+}
+
+function getCropAnalysis() {
+    const cropCounts = {};
+    
+    filteredData.forEach(order => {
+        const crops = order['Crops Selected'];
+        if (crops) {
+            const cropList = crops.split(',').map(c => c.trim()).filter(c => c);
+            cropList.forEach(crop => {
+                cropCounts[crop] = (cropCounts[crop] || 0) + 1;
+            });
+        }
+    });
+    
+    return cropCounts;
+}
+
+function getDistrictAnalysis() {
+    const districtData = {};
+    const farmerTotals = calculateFarmerTotals();
+    
+    filteredData.forEach(order => {
+        const district = order['District']?.trim() || 'Unknown';
+        const farmerMobile = order['Farmer Mobile'];
+        const farmerVerifiedTotal = farmerTotals[farmerMobile]?.verifiedValue || 0;
+        const orderCashback = calculateOrderCashback(order, farmerVerifiedTotal);
+        
+        if (!districtData[district]) {
+            districtData[district] = {
+                totalFarmers: new Set(),
+                winners: new Set(),
+                orders: 0,
+                totalCashback: 0
+            };
+        }
+        
+        districtData[district].totalFarmers.add(farmerMobile);
+        districtData[district].orders++;
+        
+        if (orderCashback > 0) {
+            districtData[district].winners.add(farmerMobile);
+            districtData[district].totalCashback += orderCashback;
+        }
+    });
+    
+    // Convert sets to counts
+    Object.keys(districtData).forEach(district => {
+        districtData[district].totalFarmersCount = districtData[district].totalFarmers.size;
+        districtData[district].winnersCount = districtData[district].winners.size;
+    });
+    
+    return districtData;
+}
+
+function getRetailerAnalysis() {
+    const retailerData = {};
+    
+    filteredData.forEach(order => {
+        const rin = order['RIN'];
+        const retailerName = order['Retailer Name'];
+        const farmerMobile = order['Farmer Mobile'];
+        const status = order['Approval Status']?.trim();
+        
+        if (!rin) return;
+        
+        if (!retailerData[rin]) {
+            retailerData[rin] = {
+                name: retailerName,
+                orders: 0,
+                farmers: new Set(),
+                verified: 0,
+                totalUnits: 0
+            };
+        }
+        
+        retailerData[rin].orders++;
+        retailerData[rin].farmers.add(farmerMobile);
+        
+        if (status === 'Verified') {
+            retailerData[rin].verified++;
+        }
+        
+        // Count total units
+        for (let i = 1; i <= 5; i++) {
+            const quantity = parseInt(order[`Product Quantity ${i}`]) || 0;
+            retailerData[rin].totalUnits += quantity;
+        }
+    });
+    
+    // Convert to array and calculate verification rate
+    const retailers = Object.keys(retailerData).map(rin => ({
+        rin,
+        name: retailerData[rin].name,
+        orders: retailerData[rin].orders,
+        farmers: retailerData[rin].farmers.size,
+        verified: retailerData[rin].verified,
+        totalUnits: retailerData[rin].totalUnits,
+        verificationRate: (retailerData[rin].verified / retailerData[rin].orders * 100).toFixed(1)
+    }));
+    
+    // Sort by orders descending
+    retailers.sort((a, b) => b.orders - a.orders);
+    
+    return retailers;
+}
+
+// ===== Update Dashboard Functions =====
+function updateKeyMetrics() {
+    // Total scans
+    document.getElementById('totalScans').textContent = formatNumber(filteredData.length);
+    
+    // Unique farmers
+    const uniqueFarmers = new Set(filteredData.map(o => o['Farmer Mobile']).filter(m => m)).size;
+    document.getElementById('uniqueFarmers').textContent = formatNumber(uniqueFarmers);
+    
+    // Status counts - DIRECTLY from Approval Status column
+    const pending = filteredData.filter(o => o['Approval Status']?.trim() === 'Pending').length;
+    const verified = filteredData.filter(o => o['Approval Status']?.trim() === 'Verified').length;
+    const rejected = filteredData.filter(o => o['Approval Status']?.trim() === 'Rejected').length;
+    
+    document.getElementById('pendingCount').textContent = formatNumber(pending);
+    document.getElementById('verifiedCount').textContent = formatNumber(verified);
+    document.getElementById('rejectedCount').textContent = formatNumber(rejected);
+    
+    // Cashback winners - Calculate per farmer with total verified amount >= 10000
+    const farmerTotals = calculateFarmerTotals();
+    const winnersSet = new Set();
+    let totalCashback = 0;
+    
+    filteredData.forEach(order => {
+        const farmerMobile = order['Farmer Mobile'];
+        const farmerVerifiedTotal = farmerTotals[farmerMobile]?.verifiedValue || 0;
+        const cashback = calculateOrderCashback(order, farmerVerifiedTotal);
+        
+        if (cashback > 0) {
+            winnersSet.add(farmerMobile);
+            totalCashback += cashback;
+        }
+    });
+    
+    document.getElementById('cashbackWinners').textContent = formatNumber(winnersSet.size);
+    document.getElementById('totalCashback').textContent = formatCurrency(totalCashback);
+    
+    // Active retailers
+    const activeRetailers = new Set(filteredData.map(o => o['RIN']).filter(r => r)).size;
+    document.getElementById('activeRetailers').textContent = formatNumber(activeRetailers);
+}
+
+function updateProductUnitsChart() {
+    const sales = getProductSales();
+    const products = Object.keys(sales);
+    const units = products.map(p => sales[p].units);
+    
+    const ctx = document.getElementById('productUnitsChart').getContext('2d');
+    
+    if (charts.productUnits) {
+        charts.productUnits.destroy();
     }
     
-    .metric-content h3 {
-        font-size: 1.5rem;
+    charts.productUnits = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: products,
+            datasets: [{
+                label: 'Units Ordered',
+                data: units,
+                backgroundColor: [
+                    '#00695f',
+                    '#4db6ac',
+                    '#ffb300',
+                    '#ff7043',
+                    '#ab47bc'
+                ],
+                borderColor: [
+                    '#004d40',
+                    '#00897b',
+                    '#ff9800',
+                    '#ff5722',
+                    '#9c27b0'
+                ],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'Units: ' + formatNumber(context.parsed.y);
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return formatNumber(value);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateCashbackChart() {
+    const sales = getProductSales();
+    const products = Object.keys(sales);
+    const cashbacks = products.map(p => sales[p].cashback);
+    
+    const ctx = document.getElementById('cashbackChart').getContext('2d');
+    
+    if (charts.cashback) {
+        charts.cashback.destroy();
     }
     
-    .chart-container {
-        height: 250px;
+    charts.cashback = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: products,
+            datasets: [{
+                label: 'Cashback Distributed',
+                data: cashbacks,
+                backgroundColor: 'rgba(0, 105, 95, 0.8)',
+                borderColor: '#004d40',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'Cashback: ' + formatCurrency(context.parsed.y);
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '₹' + formatNumber(value);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateStatusPieChart() {
+    const pending = filteredData.filter(o => o['Approval Status']?.trim() === 'Pending').length;
+    const verified = filteredData.filter(o => o['Approval Status']?.trim() === 'Verified').length;
+    const rejected = filteredData.filter(o => o['Approval Status']?.trim() === 'Rejected').length;
+    
+    const ctx = document.getElementById('statusPieChart').getContext('2d');
+    
+    if (charts.statusPie) {
+        charts.statusPie.destroy();
     }
     
-    .map-grid {
-        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    charts.statusPie = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Verified', 'Pending', 'Rejected'],
+            datasets: [{
+                data: [verified, pending, rejected],
+                backgroundColor: [
+                    '#4caf50',
+                    '#ff9800',
+                    '#f44336'
+                ],
+                borderColor: '#ffffff',
+                borderWidth: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = total > 0 ? ((context.parsed / total) * 100).toFixed(1) : 0;
+                            return context.label + ': ' + formatNumber(context.parsed) + ' (' + percentage + '%)';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateCropChart() {
+    const cropAnalysis = getCropAnalysis();
+    const crops = Object.keys(cropAnalysis).sort((a, b) => cropAnalysis[b] - cropAnalysis[a]).slice(0, 10);
+    const counts = crops.map(c => cropAnalysis[c]);
+    
+    const ctx = document.getElementById('cropChart').getContext('2d');
+    
+    if (charts.crop) {
+        charts.crop.destroy();
     }
     
-    #indiaMap {
-        height: 400px;
+    charts.crop = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: crops,
+            datasets: [{
+                label: 'Orders Count',
+                data: counts,
+                backgroundColor: '#4db6ac',
+                borderColor: '#00897b',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'Orders: ' + formatNumber(context.parsed.x);
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return formatNumber(value);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateDistrictChart() {
+    const districtAnalysis = getDistrictAnalysis();
+    const districts = Object.keys(districtAnalysis)
+        .filter(d => d !== 'Unknown' && d !== '')
+        .sort((a, b) => districtAnalysis[b].totalFarmersCount - districtAnalysis[a].totalFarmersCount)
+        .slice(0, 10);
+    
+    const farmerCounts = districts.map(d => districtAnalysis[d].totalFarmersCount);
+    const winnerCounts = districts.map(d => districtAnalysis[d].winnersCount);
+    
+    const ctx = document.getElementById('districtChart').getContext('2d');
+    
+    if (charts.district) {
+        charts.district.destroy();
     }
     
-    .date-range-modal-content {
-        min-width: 300px;
-        padding: var(--spacing-md);
+    charts.district = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: districts,
+            datasets: [
+                {
+                    label: 'Total Farmers',
+                    data: farmerCounts,
+                    backgroundColor: 'rgba(77, 182, 172, 0.7)',
+                    borderColor: '#4db6ac',
+                    borderWidth: 2
+                },
+                {
+                    label: 'Cashback Winners',
+                    data: winnerCounts,
+                    backgroundColor: 'rgba(0, 105, 95, 0.9)',
+                    borderColor: '#004d40',
+                    borderWidth: 2
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'bottom'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': ' + formatNumber(context.parsed.y);
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return formatNumber(value);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateBudgetTracking() {
+    const sales = getProductSales();
+    
+    Object.keys(PRODUCT_CONFIG).forEach(product => {
+        const config = PRODUCT_CONFIG[product];
+        const productSales = sales[product];
+        const consumed = productSales.cashback;
+        const remaining = config.budget - consumed;
+        const percentage = (consumed / config.budget * 100).toFixed(1);
+        
+        const elementId = 'budget' + product.replace(/\s+/g, '');
+        const element = document.getElementById(elementId);
+        
+        if (element) {
+            const remainingSpan = element.querySelector('.budget-remaining');
+            const consumedBar = element.querySelector('.budget-consumed');
+            const stats = element.querySelectorAll('.budget-stats strong');
+            
+            remainingSpan.textContent = formatCurrency(remaining) + ' Remaining';
+            remainingSpan.style.color = remaining > 0 ? '#4caf50' : '#f44336';
+            
+            consumedBar.style.width = Math.min(percentage, 100) + '%';
+            
+            if (stats.length >= 3) {
+                stats[0].textContent = formatNumber(productSales.units);
+                stats[1].textContent = formatCurrency(consumed);
+            }
+        }
+    });
+}
+
+function updateTopRetailersTable() {
+    const retailers = getRetailerAnalysis();
+    const top10 = retailers.slice(0, 10);
+    
+    const tbody = document.getElementById('topRetailersTable');
+    
+    if (top10.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="no-data">No data available</td></tr>';
+        return;
     }
     
-    .map-legend {
-        flex-direction: column;
-        gap: var(--spacing-xs);
-    }
+    tbody.innerHTML = top10.map((retailer, index) => {
+        const rankClass = index < 3 ? `rank-${index + 1}` : '';
+        const medal = index < 3 ? `<span class="medal ${rankClass}">${index + 1}</span>` : index + 1;
+        
+        return `
+            <tr>
+                <td>${medal}</td>
+                <td>${retailer.rin}</td>
+                <td>${retailer.name}</td>
+                <td>${formatNumber(retailer.orders)}</td>
+                <td>${formatNumber(retailer.farmers)}</td>
+                <td>${formatNumber(retailer.totalUnits)}</td>
+                <td>${retailer.verificationRate}%</td>
+            </tr>
+        `;
+    }).join('');
 }
 
-@media (max-width: 480px) {
-    .logo {
-        height: 40px;
+function updateDistrictMap() {
+    const districtAnalysis = getDistrictAnalysis();
+    const districts = Object.keys(districtAnalysis)
+        .filter(d => d !== 'Unknown' && d !== '')
+        .sort((a, b) => districtAnalysis[b].winnersCount - districtAnalysis[a].winnersCount);
+    
+    const mapGrid = document.getElementById('districtMapGrid');
+    
+    if (districts.length === 0) {
+        mapGrid.innerHTML = '<p class="no-data">No district data available</p>';
+        return;
     }
     
-    .header-text h1 {
-        font-size: 1.2rem;
+    mapGrid.innerHTML = districts.map(district => {
+        const data = districtAnalysis[district];
+        const isActive = data.winnersCount > 0;
+        
+        return `
+            <div class="district-item ${isActive ? 'active' : ''}">
+                <h4>${district}</h4>
+                <div class="district-winners">${formatNumber(data.winnersCount)}</div>
+                <div class="district-stats">Winners</div>
+                <div class="district-total">Total: ${formatNumber(data.totalFarmersCount)} farmers</div>
+            </div>
+        `;
+    }).join('');
+}
+
+// ===== India Map with Leaflet =====
+function initializeIndiaMap() {
+    const mapElement = document.getElementById('indiaMap');
+    if (!mapElement) {
+        console.error('Map element not found');
+        return;
     }
     
-    .subtitle {
-        font-size: 0.8rem;
+    if (indiaMapInstance) {
+        indiaMapInstance.remove();
+        indiaMapInstance = null;
     }
     
-    .btn-primary {
-        padding: 0.6rem 1rem;
-        font-size: 0.9rem;
+    try {
+        // Initialize map centered on Uttar Pradesh
+        indiaMapInstance = L.map('indiaMap').setView([27.0, 80.0], 7);
+        
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 18,
+            minZoom: 6
+        }).addTo(indiaMapInstance);
+        
+        // Add custom styling to map
+        mapElement.style.border = '2px solid #00695f';
+        mapElement.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+        
+        console.log('Map initialized successfully');
+    } catch (error) {
+        console.error('Error initializing map:', error);
+    }
+}
+
+function updateIndiaMap() {
+    if (!indiaMapInstance) {
+        initializeIndiaMap();
+        // Wait a bit for map to initialize
+        setTimeout(updateIndiaMap, 500);
+        return;
     }
     
-    .chart-card {
-        padding: var(--spacing-md);
-    }
+    // Clear existing markers
+    mapMarkers.forEach(marker => {
+        try {
+            marker.remove();
+        } catch (e) {
+            console.error('Error removing marker:', e);
+        }
+    });
+    mapMarkers = [];
     
-    .retailers-table {
-        font-size: 0.85rem;
-    }
+    const districtAnalysis = getDistrictAnalysis();
     
-    .retailers-table th,
-    .retailers-table td {
-        padding: 0.75rem 0.5rem;
-    }
-}
-
-/* ===== Animations ===== */
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.metric-card,
-.chart-card {
-    animation: fadeIn 0.5s ease forwards;
-}
-
-.metric-card:nth-child(1) { animation-delay: 0.1s; }
-.metric-card:nth-child(2) { animation-delay: 0.2s; }
-.metric-card:nth-child(3) { animation-delay: 0.3s; }
-.metric-card:nth-child(4) { animation-delay: 0.4s; }
-.metric-card:nth-child(5) { animation-delay: 0.5s; }
-
-/* ===== Print Styles ===== */
-@media print {
-    .dashboard-header,
-    .controls-section,
-    .dashboard-footer,
-    .loading-overlay {
-        display: none;
-    }
+    // Find max winners for scaling
+    const maxWinners = Math.max(...Object.values(districtAnalysis).map(d => d.winnersCount), 1);
     
-    body {
-        background: white;
-    }
+    Object.keys(districtAnalysis).forEach(district => {
+        const coords = UP_DISTRICTS_COORDS[district];
+        if (!coords) return;
+        
+        const data = districtAnalysis[district];
+        const winnersCount = data.winnersCount;
+        const totalFarmers = data.totalFarmersCount;
+        const totalCashback = data.totalCashback || 0;
+        
+        // Scale marker size based on winners count
+        const baseSize = 10;
+        const maxSize = 40;
+        const size = baseSize + (winnersCount / maxWinners) * (maxSize - baseSize);
+        
+        // Color based on activity level
+        let color = '#b2dfdb'; // Low
+        if (winnersCount > maxWinners * 0.6) {
+            color = '#00695f'; // High
+        } else if (winnersCount > maxWinners * 0.3) {
+            color = '#4db6ac'; // Medium
+        }
+        
+        try {
+            // Create circle marker
+            const marker = L.circleMarker(coords, {
+                radius: size / 2,
+                fillColor: color,
+                color: '#ffffff',
+                weight: 2,
+                opacity: 1,
+                fillOpacity: 0.8
+            }).addTo(indiaMapInstance);
+            
+            // Create popup content
+            const popupContent = `
+                <div style="font-family: 'Segoe UI', sans-serif; padding: 8px;">
+                    <h4 style="margin: 0 0 8px 0; color: #00695f; font-size: 1.1rem;">${district}</h4>
+                    <div style="font-size: 0.9rem;">
+                        <p style="margin: 4px 0;"><strong>Total Farmers:</strong> ${formatNumber(totalFarmers)}</p>
+                        <p style="margin: 4px 0; color: #00695f;"><strong>Cashback Winners:</strong> ${formatNumber(winnersCount)}</p>
+                        <p style="margin: 4px 0;"><strong>Total Orders:</strong> ${formatNumber(data.orders)}</p>
+                        <p style="margin: 4px 0; color: #ff9800;"><strong>Total Cashback:</strong> ${formatCurrency(totalCashback)}</p>
+                    </div>
+                </div>
+            `;
+            
+            marker.bindPopup(popupContent);
+            
+            // Add hover effect
+            marker.on('mouseover', function() {
+                this.setStyle({
+                    radius: size / 2 + 3,
+                    fillOpacity: 1
+                });
+            });
+            
+            marker.on('mouseout', function() {
+                this.setStyle({
+                    radius: size / 2,
+                    fillOpacity: 0.8
+                });
+            });
+            
+            mapMarkers.push(marker);
+        } catch (error) {
+            console.error('Error creating marker for', district, ':', error);
+        }
+    });
+}
+
+function updateAllCharts() {
+    updateKeyMetrics();
+    updateProductUnitsChart();
+    updateCashbackChart();
+    updateStatusPieChart();
+    updateCropChart();
+    updateDistrictChart();
+    updateBudgetTracking();
+    updateTopRetailersTable();
+    updateDistrictMap();
+    updateIndiaMap();
+}
+
+// ===== Filter Functions =====
+function populateFilters() {
+    // Get unique values
+    const districts = [...new Set(allData.map(o => o['District']).filter(d => d))].sort();
+    const retailers = [...new Set(allData.map(o => o['Retailer Name']).filter(r => r))].sort();
     
-    .chart-card {
-        break-inside: avoid;
-        box-shadow: none;
-        border: 1px solid var(--border-color);
+    const crops = new Set();
+    allData.forEach(order => {
+        const cropList = order['Crops Selected'];
+        if (cropList) {
+            cropList.split(',').map(c => c.trim()).filter(c => c).forEach(crop => crops.add(crop));
+        }
+    });
+    const cropsList = [...crops].sort();
+    
+    const products = Object.keys(PRODUCT_CONFIG);
+    
+    // Populate dropdowns
+    const districtFilter = document.getElementById('districtFilter');
+    districts.forEach(district => {
+        const option = document.createElement('option');
+        option.value = district;
+        option.textContent = district;
+        districtFilter.appendChild(option);
+    });
+    
+    const cropFilter = document.getElementById('cropFilter');
+    cropsList.forEach(crop => {
+        const option = document.createElement('option');
+        option.value = crop;
+        option.textContent = crop;
+        cropFilter.appendChild(option);
+    });
+    
+    const productFilter = document.getElementById('productFilter');
+    products.forEach(product => {
+        const option = document.createElement('option');
+        option.value = product;
+        option.textContent = product;
+        productFilter.appendChild(option);
+    });
+    
+    const retailerFilter = document.getElementById('retailerFilter');
+    retailers.forEach(retailer => {
+        const option = document.createElement('option');
+        option.value = retailer;
+        option.textContent = retailer;
+        retailerFilter.appendChild(option);
+    });
+}
+
+function applyFilters() {
+    const searchTerm = document.getElementById('universalSearch').value.toLowerCase();
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    const district = document.getElementById('districtFilter').value;
+    const landAcreage = document.getElementById('landAcreageFilter').value;
+    const crop = document.getElementById('cropFilter').value;
+    const product = document.getElementById('productFilter').value;
+    const retailer = document.getElementById('retailerFilter').value;
+    
+    filteredData = allData.filter(order => {
+        // Search filter
+        if (searchTerm) {
+            const searchableText = [
+                order['Farmer Name'],
+                order['Farmer Mobile'],
+                order['Retailer Name'],
+                order['Order ID'],
+                order['RIN']
+            ].join(' ').toLowerCase();
+            
+            if (!searchableText.includes(searchTerm)) {
+                return false;
+            }
+        }
+        
+        // Date filter
+        if (startDate || endDate) {
+            const orderDate = parseDate(order['Date of Entry']);
+            if (orderDate) {
+                if (startDate && orderDate < new Date(startDate)) return false;
+                if (endDate && orderDate > new Date(endDate)) return false;
+            }
+        }
+        
+        // District filter
+        if (district && order['District']?.trim() !== district) {
+            return false;
+        }
+        
+        // Land Acreage filter
+        if (landAcreage) {
+            const acreage = parseFloat(order['Land Acreage']) || 0;
+            
+            if (landAcreage === '0-5' && (acreage < 0 || acreage > 5)) return false;
+            if (landAcreage === '5-10' && (acreage < 5 || acreage > 10)) return false;
+            if (landAcreage === '10-25' && (acreage < 10 || acreage > 25)) return false;
+            if (landAcreage === '25+' && acreage < 25) return false;
+        }
+        
+        // Crop filter
+        if (crop) {
+            const crops = order['Crops Selected'];
+            if (!crops || !crops.includes(crop)) {
+                return false;
+            }
+        }
+        
+        // Product filter
+        if (product) {
+            let hasProduct = false;
+            for (let i = 1; i <= 5; i++) {
+                const productName = extractProductName(order[`Product Name ${i}`]);
+                if (productName === product) {
+                    hasProduct = true;
+                    break;
+                }
+            }
+            if (!hasProduct) {
+                return false;
+            }
+        }
+        
+        // Retailer filter
+        if (retailer && order['Retailer Name'] !== retailer) {
+            return false;
+        }
+        
+        return true;
+    });
+    
+    updateAllCharts();
+}
+
+function resetFilters() {
+    document.getElementById('universalSearch').value = '';
+    document.getElementById('startDate').value = '';
+    document.getElementById('endDate').value = '';
+    document.getElementById('dateRangeFilter').value = '';
+    document.getElementById('districtFilter').value = '';
+    document.getElementById('landAcreageFilter').value = '';
+    document.getElementById('cropFilter').value = '';
+    document.getElementById('productFilter').value = '';
+    document.getElementById('retailerFilter').value = '';
+    
+    document.getElementById('clearSearch').classList.remove('visible');
+    
+    filteredData = [...allData];
+    updateAllCharts();
+}
+
+// ===== Download Function =====
+function downloadReport() {
+    // Create CSV content
+    let csv = 'Order ID,Date of Entry,RIN,Retailer Name,Farmer Name,Farmer Mobile,District,Crops Selected,';
+    csv += 'Approval Status,Order Value,Farmer Total Verified,Cashback Amount,Is Winner\n';
+    
+    const farmerTotals = calculateFarmerTotals();
+    
+    filteredData.forEach(order => {
+        const farmerMobile = order['Farmer Mobile'];
+        const farmerVerifiedTotal = farmerTotals[farmerMobile]?.verifiedValue || 0;
+        const orderValue = calculateOrderValue(order);
+        const cashback = calculateOrderCashback(order, farmerVerifiedTotal);
+        const isWinner = cashback > 0 ? 'Yes' : 'No';
+        
+        csv += `${order['Order ID']},`;
+        csv += `${order['Date of Entry']},`;
+        csv += `${order['RIN']},`;
+        csv += `"${order['Retailer Name']}",`;
+        csv += `"${order['Farmer Name']}",`;
+        csv += `${order['Farmer Mobile']},`;
+        csv += `${order['District']},`;
+        csv += `"${order['Crops Selected']}",`;
+        csv += `${order['Approval Status']},`;
+        csv += `${orderValue},`;
+        csv += `${farmerVerifiedTotal},`;
+        csv += `${cashback},`;
+        csv += `${isWinner}\n`;
+    });
+    
+    // Create download link
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `yara_cashback_report_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// ===== Initialize Dashboard =====
+async function initDashboard() {
+    try {
+        // Show loading overlay
+        document.getElementById('loadingOverlay').classList.remove('hidden');
+        
+        // Load CSV data
+        const response = await fetch('yara_cbc.csv');
+        const csvText = await response.text();
+        
+        // Parse data
+        allData = parseCSV(csvText);
+        filteredData = [...allData];
+        
+        console.log('Data loaded:', allData.length, 'rows');
+        
+        // Populate filters
+        populateFilters();
+        
+        // Update dashboard
+        updateAllCharts();
+        
+        // Initialize map after a short delay to ensure DOM is ready
+        setTimeout(() => {
+            initializeIndiaMap();
+            updateIndiaMap();
+        }, 1000);
+        
+        // Update last updated time
+        document.getElementById('lastUpdated').textContent = new Date().toLocaleString();
+        
+        // Hide loading overlay
+        setTimeout(() => {
+            document.getElementById('loadingOverlay').classList.add('hidden');
+        }, 500);
+        
+    } catch (error) {
+        console.error('Error initializing dashboard:', error);
+        alert('Error loading dashboard data. Please check the console for details.');
+        document.getElementById('loadingOverlay').classList.add('hidden');
     }
 }
 
-/* ===== Date Range Modal ===== */
-.date-range-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 10000;
-    animation: fadeIn 0.2s ease;
-}
-
-.date-range-modal-content {
-    background: white;
-    padding: var(--spacing-lg);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg);
-    min-width: 400px;
-    max-width: 90%;
-}
-
-.date-range-modal-content h3 {
-    margin-bottom: var(--spacing-md);
-    color: var(--primary-color);
-    font-size: 1.3rem;
-}
-
-.date-range-inputs-modal {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-md);
-    margin-bottom: var(--spacing-md);
-}
-
-.date-range-inputs-modal label {
-    display: block;
-    font-weight: 600;
-    margin-bottom: var(--spacing-xs);
-    color: var(--text-secondary);
-}
-
-.date-range-inputs-modal input {
-    width: 100%;
-    padding: 0.75rem;
-    border: 2px solid var(--border-color);
-    border-radius: var(--radius-md);
-    font-size: 1rem;
-}
-
-.date-range-buttons {
-    display: flex;
-    gap: var(--spacing-sm);
-    justify-content: flex-end;
-}
-
-.date-range-buttons button {
-    padding: 0.75rem 1.5rem;
-    border: none;
-    border-radius: var(--radius-md);
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.btn-apply {
-    background-color: var(--primary-color);
-    color: white;
-}
-
-.btn-apply:hover {
-    background-color: #004d40;
-}
-
-.btn-clear {
-    background-color: var(--warning-color);
-    color: white;
-}
-
-.btn-clear:hover {
-    background-color: #f57c00;
-}
-
-.btn-cancel {
-    background-color: var(--text-secondary);
-    color: white;
-}
-
-.btn-cancel:hover {
-    background-color: var(--text-primary);
-}
-
-/* ===== Utility Classes ===== */
-.text-center { text-align: center; }
-.text-right { text-align: right; }
-.text-left { text-align: left; }
-
-.mt-1 { margin-top: var(--spacing-xs); }
-.mt-2 { margin-top: var(--spacing-sm); }
-.mt-3 { margin-top: var(--spacing-md); }
-
-.mb-1 { margin-bottom: var(--spacing-xs); }
-.mb-2 { margin-bottom: var(--spacing-sm); }
-.mb-3 { margin-bottom: var(--spacing-md); }
+// ===== Event Listeners =====
+document.addEventListener('DOMContentLoaded', () => {
+    // Initialize dashboard
+    initDashboard();
+    
+    // Search functionality
+    const searchInput = document.getElementById('universalSearch');
+    const clearSearch = document.getElementById('clearSearch');
+    
+    searchInput.addEventListener('input', (e) => {
+        if (e.target.value) {
+            clearSearch.classList.add('visible');
+        } else {
+            clearSearch.classList.remove('visible');
+        }
+        
+        // Debounce search
+        clearTimeout(searchInput.debounceTimer);
+        searchInput.debounceTimer = setTimeout(() => {
+            applyFilters();
+        }, 300);
+    });
+    
+    clearSearch.addEventListener('click', () => {
+        searchInput.value = '';
+        clearSearch.classList.remove('visible');
+        applyFilters();
+    });
+    
+    // Date Range functionality - simple version
+    const dateRangeInput = document.getElementById('dateRangeFilter');
+    const startDateInput = document.getElementById('startDate');
+    const endDateInput = document.getElementById('endDate');
+    
+    dateRangeInput.addEventListener('click', function() {
+        const currentStart = startDateInput.value;
+        const currentEnd = endDateInput.value;
+        
+        const startPrompt = prompt('Enter start date (YYYY-MM-DD):', currentStart);
+        if (startPrompt !== null) {
+            startDateInput.value = startPrompt;
+            
+            const endPrompt = prompt('Enter end date (YYYY-MM-DD):', currentEnd);
+            if (endPrompt !== null) {
+                endDateInput.value = endPrompt;
+                
+                if (startPrompt && endPrompt) {
+                    dateRangeInput.value = `${startPrompt} to ${endPrompt}`;
+                } else if (startPrompt) {
+                    dateRangeInput.value = `From ${startPrompt}`;
+                } else if (endPrompt) {
+                    dateRangeInput.value = `Until ${endPrompt}`;
+                }
+                
+                applyFilters();
+            }
+        }
+    });
+    
+    // Filter listeners
+    document.getElementById('districtFilter').addEventListener('change', applyFilters);
+    document.getElementById('landAcreageFilter').addEventListener('change', applyFilters);
+    document.getElementById('cropFilter').addEventListener('change', applyFilters);
+    document.getElementById('productFilter').addEventListener('change', applyFilters);
+    document.getElementById('retailerFilter').addEventListener('change', applyFilters);
+    
+    // Reset filters
+    document.getElementById('resetFilters').addEventListener('click', resetFilters);
+    
+    // Download report
+    document.getElementById('downloadBtn').addEventListener('click', downloadReport);
+});
