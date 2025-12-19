@@ -1,1396 +1,943 @@
-// ===== Global Variables =====
-let allData = [];
-let filteredData = [];
-let charts = {};
-
-// Product configuration with pricing and cashback info
-const PRODUCT_CONFIG = {
-    'YaraMila Complex': {
-        packSize: '25kg',
-        price: 2400,
-        cashback: 40,
-        budget: 75000
-    },
-    'YaraLiva Nitrabor': {
-        packSize: '25kg',
-        price: 1600,
-        cashback: 25,
-        budget: 50000
-    },
-    'YaraVita Seniphos': {
-        packSize: '500ml',
-        price: 850,
-        cashback: 20,
-        budget: 35000
-    },
-    'YaraVita Bortrac': {
-        packSize: '250ml',
-        price: 500,
-        cashback: 10,
-        budget: 15000
-    },
-    'YaraVita Zintrac 700': {
-        packSize: '250ml',
-        price: 450,
-        cashback: 10,
-        budget: 25000
-    }
-};
-
-const CASHBACK_THRESHOLD = 10000;
-
-// ===== Utility Functions =====
-function parseCSV(csvText) {
-    const lines = csvText.split('\n');
-    const headers = lines[0].split(',').map(h => h.trim());
-    const data = [];
-    
-    let i = 1;
-    while (i < lines.length) {
-        let currentLine = lines[i];
-        let row = [];
-        let inQuotes = false;
-        let currentField = '';
-        
-        for (let j = 0; j < currentLine.length; j++) {
-            const char = currentLine[j];
-            
-            if (char === '"') {
-                inQuotes = !inQuotes;
-            } else if (char === ',' && !inQuotes) {
-                row.push(currentField.trim());
-                currentField = '';
-            } else {
-                currentField += char;
-            }
-        }
-        row.push(currentField.trim());
-        
-        // If we're in quotes at end of line, continue to next line
-        while (inQuotes && i + 1 < lines.length) {
-            i++;
-            currentLine = lines[i];
-            currentField += '\n';
-            
-            for (let j = 0; j < currentLine.length; j++) {
-                const char = currentLine[j];
-                
-                if (char === '"') {
-                    inQuotes = !inQuotes;
-                } else if (char === ',' && !inQuotes) {
-                    row.push(currentField.trim());
-                    currentField = '';
-                } else {
-                    currentField += char;
-                }
-            }
-            row.push(currentField.trim());
-        }
-        
-        if (row.length > 1 && row.some(field => field !== '')) {
-            const rowData = {};
-            headers.forEach((header, index) => {
-                rowData[header] = row[index] || '';
-            });
-            data.push(rowData);
-        }
-        
-        i++;
-    }
-    
-    return data;
+/* ===== CSS Reset and Base Styles ===== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
 }
 
-function extractProductName(productString) {
-    if (!productString) return '';
+:root {
+    /* Yara Brand Colors */
+    --primary-color: #00695f;
+    --secondary-color: #4db6ac;
+    --accent-color: #ffb300;
+    --success-color: #4caf50;
+    --warning-color: #ff9800;
+    --danger-color: #f44336;
+    --info-color: #2196f3;
     
-    // Extract product name before "Cashback Amount"
-    const match = productString.match(/^(.*?)\s*(?:Cashback Amount|$)/);
-    return match ? match[1].trim() : productString.trim();
+    /* Neutral Colors */
+    --text-primary: #212121;
+    --text-secondary: #757575;
+    --bg-primary: #f5f7fa;
+    --bg-secondary: #ffffff;
+    --border-color: #e0e0e0;
+    
+    /* Shadows */
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.08);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+    
+    /* Spacing */
+    --spacing-xs: 0.5rem;
+    --spacing-sm: 1rem;
+    --spacing-md: 1.5rem;
+    --spacing-lg: 2rem;
+    --spacing-xl: 3rem;
+    
+    /* Border Radius */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
 }
 
-function extractCashbackAmount(productString) {
-    if (!productString) return 0;
-    
-    // Extract cashback amount from the string like "YaraLiva Nitrabor \n Cashback Amount : ₹25"
-    const match = productString.match(/Cashback Amount\s*:\s*₹(\d+)/i);
-    return match ? parseInt(match[1]) : 0;
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    overflow-x: hidden;
 }
 
-function parseDate(dateString) {
-    if (!dateString) return null;
-    
-    // Handle DD-MM-YYYY format
-    const parts = dateString.split(/[\s-]/);
-    if (parts.length >= 3) {
-        const day = parseInt(parts[0]);
-        const month = parseInt(parts[1]) - 1;
-        const year = parseInt(parts[2]);
-        return new Date(year, month, day);
-    }
-    
-    return new Date(dateString);
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 var(--spacing-md);
 }
 
-function formatCurrency(amount) {
-    return '₹' + amount.toLocaleString('en-IN');
+/* ===== Header Styles ===== */
+.dashboard-header {
+    background: linear-gradient(135deg, var(--primary-color) 0%, #004d40 100%);
+    color: white;
+    padding: var(--spacing-md) 0;
+    box-shadow: var(--shadow-md);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
 }
 
-function formatNumber(num) {
-    return num.toLocaleString('en-IN');
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
 }
 
-// ===== Data Processing Functions =====
-function calculateOrderValue(order) {
-    let totalValue = 0;
-    
-    for (let i = 1; i <= 5; i++) {
-        const productName = extractProductName(order[`Product Name ${i}`]);
-        const quantity = parseInt(order[`Product Quantity ${i}`]) || 0;
-        
-        if (productName && PRODUCT_CONFIG[productName]) {
-            totalValue += PRODUCT_CONFIG[productName].price * quantity;
-        }
-    }
-    
-    return totalValue;
+.logo-section {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
 }
 
-function calculateOrderCashback(order, farmerTotalValue) {
-    // Only eligible if farmer's total verified value >= 10000 and this order status is Verified
-    if (farmerTotalValue < CASHBACK_THRESHOLD || order['Approval Status'] !== 'Verified') {
-        return 0;
-    }
-    
-    let totalCashback = 0;
-    
-    for (let i = 1; i <= 5; i++) {
-        const productString = order[`Product Name ${i}`];
-        const quantity = parseInt(order[`Product Quantity ${i}`]) || 0;
-        
-        if (productString) {
-            // Try to extract cashback from the product string first
-            const cashbackFromString = extractCashbackAmount(productString);
-            
-            if (cashbackFromString > 0) {
-                totalCashback += cashbackFromString * quantity;
-            } else {
-                // Fallback to product config
-                const productName = extractProductName(productString);
-                if (productName && PRODUCT_CONFIG[productName]) {
-                    totalCashback += PRODUCT_CONFIG[productName].cashback * quantity;
-                }
-            }
-        }
-    }
-    
-    return totalCashback;
+.logo {
+    height: 60px;
+    width: auto;
+    background: white;
+    padding: var(--spacing-xs);
+    border-radius: var(--radius-md);
 }
 
-function calculateFarmerTotals() {
-    const farmerTotals = {};
-    
-    // First pass: calculate total verified value per farmer
-    filteredData.forEach(order => {
-        const farmerMobile = order['Farmer Mobile'];
-        const isVerified = order['Approval Status'] === 'Verified';
-        
-        if (!farmerTotals[farmerMobile]) {
-            farmerTotals[farmerMobile] = {
-                totalValue: 0,
-                verifiedValue: 0,
-                orders: []
-            };
-        }
-        
-        const orderValue = calculateOrderValue(order);
-        farmerTotals[farmerMobile].totalValue += orderValue;
-        
-        if (isVerified) {
-            farmerTotals[farmerMobile].verifiedValue += orderValue;
-        }
-        
-        farmerTotals[farmerMobile].orders.push(order);
-    });
-    
-    return farmerTotals;
+.header-text h1 {
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
 }
 
-function getProductSales() {
-    const sales = {};
-    
-    Object.keys(PRODUCT_CONFIG).forEach(product => {
-        sales[product] = { units: 0, cashback: 0, orders: 0 };
-    });
-    
-    const farmerTotals = calculateFarmerTotals();
-    
-    filteredData.forEach(order => {
-        const farmerMobile = order['Farmer Mobile'];
-        const farmerVerifiedTotal = farmerTotals[farmerMobile]?.verifiedValue || 0;
-        const orderCashback = calculateOrderCashback(order, farmerVerifiedTotal);
-        const isWinner = orderCashback > 0;
-        
-        for (let i = 1; i <= 5; i++) {
-            const productString = order[`Product Name ${i}`];
-            const quantity = parseInt(order[`Product Quantity ${i}`]) || 0;
-            
-            if (productString) {
-                const productName = extractProductName(productString);
-                
-                if (productName && sales[productName]) {
-                    sales[productName].units += quantity;
-                    sales[productName].orders++;
-                    
-                    if (isWinner) {
-                        // Try to get cashback from string first, then fallback to config
-                        const cashbackFromString = extractCashbackAmount(productString);
-                        
-                        if (cashbackFromString > 0) {
-                            sales[productName].cashback += cashbackFromString * quantity;
-                        } else if (PRODUCT_CONFIG[productName]) {
-                            sales[productName].cashback += PRODUCT_CONFIG[productName].cashback * quantity;
-                        }
-                    }
-                }
-            }
-        }
-    });
-    
-    return sales;
+.subtitle {
+    font-size: 0.9rem;
+    opacity: 0.9;
+    font-weight: 300;
 }
 
-function getCropAnalysis() {
-    const cropCounts = {};
-    
-    filteredData.forEach(order => {
-        const crops = order['Crops Selected'];
-        if (crops) {
-            // Split by comma and trim
-            const cropList = crops.split(',').map(c => c.trim()).filter(c => c);
-            cropList.forEach(crop => {
-                cropCounts[crop] = (cropCounts[crop] || 0) + 1;
-            });
-        }
-    });
-    
-    return cropCounts;
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
 }
 
-function getDistrictAnalysis() {
-    const districtData = {};
-    const farmerTotals = calculateFarmerTotals();
-    
-    filteredData.forEach(order => {
-        const district = order['District'] || 'Unknown';
-        const farmerMobile = order['Farmer Mobile'];
-        const farmerVerifiedTotal = farmerTotals[farmerMobile]?.verifiedValue || 0;
-        const orderCashback = calculateOrderCashback(order, farmerVerifiedTotal);
-        const isWinner = orderCashback > 0;
-        
-        if (!districtData[district]) {
-            districtData[district] = {
-                totalFarmers: new Set(),
-                winners: new Set(),
-                orders: 0,
-                totalCashback: 0
-            };
-        }
-        
-        districtData[district].totalFarmers.add(farmerMobile);
-        districtData[district].orders++;
-        
-        if (isWinner) {
-            districtData[district].winners.add(farmerMobile);
-            districtData[district].totalCashback += orderCashback;
-        }
-    });
-    
-    // Convert sets to counts
-    Object.keys(districtData).forEach(district => {
-        districtData[district].totalFarmersCount = districtData[district].totalFarmers.size;
-        districtData[district].winnersCount = districtData[district].winners.size;
-    });
-    
-    return districtData;
+.btn-primary {
+    background-color: var(--accent-color);
+    color: var(--text-primary);
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow-sm);
 }
 
-function getRetailerAnalysis() {
-    const retailerData = {};
-    
-    filteredData.forEach(order => {
-        const rin = order['RIN'];
-        const retailerName = order['Retailer Name'];
-        const farmerMobile = order['Farmer Mobile'];
-        const status = order['Approval Status'];
-        
-        if (!retailerData[rin]) {
-            retailerData[rin] = {
-                name: retailerName,
-                orders: 0,
-                farmers: new Set(),
-                verified: 0,
-                totalUnits: 0
-            };
-        }
-        
-        retailerData[rin].orders++;
-        retailerData[rin].farmers.add(farmerMobile);
-        
-        if (status === 'Verified') {
-            retailerData[rin].verified++;
-        }
-        
-        // Count total units
-        for (let i = 1; i <= 5; i++) {
-            const quantity = parseInt(order[`Product Quantity ${i}`]) || 0;
-            retailerData[rin].totalUnits += quantity;
-        }
-    });
-    
-    // Convert to array and calculate verification rate
-    const retailers = Object.keys(retailerData).map(rin => ({
-        rin,
-        name: retailerData[rin].name,
-        orders: retailerData[rin].orders,
-        farmers: retailerData[rin].farmers.size,
-        verified: retailerData[rin].verified,
-        totalUnits: retailerData[rin].totalUnits,
-        verificationRate: (retailerData[rin].verified / retailerData[rin].orders * 100).toFixed(1)
-    }));
-    
-    // Sort by orders
-    retailers.sort((a, b) => b.orders - a.orders);
-    
-    return retailers;
+.btn-primary:hover {
+    background-color: #ffa000;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
 }
 
-// ===== Update Dashboard Functions =====
-function updateKeyMetrics() {
-    // Total scans
-    document.getElementById('totalScans').textContent = formatNumber(filteredData.length);
-    
-    // Unique farmers
-    const uniqueFarmers = new Set(filteredData.map(o => o['Farmer Mobile'])).size;
-    document.getElementById('uniqueFarmers').textContent = formatNumber(uniqueFarmers);
-    
-    // Status counts - Count based on Approval Status column
-    const pending = filteredData.filter(o => o['Approval Status'] === 'Pending').length;
-    const verified = filteredData.filter(o => o['Approval Status'] === 'Verified').length;
-    const rejected = filteredData.filter(o => o['Approval Status'] === 'Rejected').length;
-    
-    document.getElementById('pendingCount').textContent = formatNumber(pending);
-    document.getElementById('verifiedCount').textContent = formatNumber(verified);
-    document.getElementById('rejectedCount').textContent = formatNumber(rejected);
-    
-    // Cashback winners - Calculate per farmer with total verified amount >= 10000
-    const farmerTotals = calculateFarmerTotals();
-    const winnersSet = new Set();
-    let totalCashback = 0;
-    
-    filteredData.forEach(order => {
-        const farmerMobile = order['Farmer Mobile'];
-        const farmerVerifiedTotal = farmerTotals[farmerMobile]?.verifiedValue || 0;
-        const cashback = calculateOrderCashback(order, farmerVerifiedTotal);
-        
-        if (cashback > 0) {
-            winnersSet.add(farmerMobile);
-            totalCashback += cashback;
-        }
-    });
-    
-    document.getElementById('cashbackWinners').textContent = formatNumber(winnersSet.size);
-    document.getElementById('totalCashback').textContent = formatCurrency(totalCashback);
-    
-    // Active retailers
-    const activeRetailers = new Set(filteredData.map(o => o['RIN'])).size;
-    document.getElementById('activeRetailers').textContent = formatNumber(activeRetailers);
+.btn-primary i {
+    font-size: 1rem;
 }
 
-function updateProductUnitsChart() {
-    const sales = getProductSales();
-    const products = Object.keys(sales);
-    const units = products.map(p => sales[p].units);
-    
-    const ctx = document.getElementById('productUnitsChart').getContext('2d');
-    
-    if (charts.productUnits) {
-        charts.productUnits.destroy();
-    }
-    
-    charts.productUnits = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: products,
-            datasets: [{
-                label: 'Units Ordered',
-                data: units,
-                backgroundColor: [
-                    '#00695f',
-                    '#4db6ac',
-                    '#ffb300',
-                    '#ff7043',
-                    '#ab47bc'
-                ],
-                borderColor: [
-                    '#004d40',
-                    '#00897b',
-                    '#ff9800',
-                    '#ff5722',
-                    '#9c27b0'
-                ],
-                borderWidth: 2
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return 'Units: ' + formatNumber(context.parsed.y);
-                        }
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        callback: function(value) {
-                            return formatNumber(value);
-                        }
-                    }
-                }
-            }
-        }
-    });
+.last-updated {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-size: 0.85rem;
+    opacity: 0.9;
 }
 
-function updateCashbackChart() {
-    const sales = getProductSales();
-    const products = Object.keys(sales);
-    const cashbacks = products.map(p => sales[p].cashback);
-    
-    const ctx = document.getElementById('cashbackChart').getContext('2d');
-    
-    if (charts.cashback) {
-        charts.cashback.destroy();
-    }
-    
-    charts.cashback = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: products,
-            datasets: [{
-                label: 'Cashback Distributed',
-                data: cashbacks,
-                backgroundColor: 'rgba(0, 105, 95, 0.8)',
-                borderColor: '#004d40',
-                borderWidth: 2
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return 'Cashback: ' + formatCurrency(context.parsed.y);
-                        }
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        callback: function(value) {
-                            return '₹' + formatNumber(value);
-                        }
-                    }
-                }
-            }
-        }
-    });
+/* ===== Controls Section ===== */
+.controls-section {
+    background: var(--bg-secondary);
+    padding: var(--spacing-lg) 0;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: var(--spacing-lg);
 }
 
-function updateStatusPieChart() {
-    const pending = filteredData.filter(o => o['Approval Status'] === 'Pending').length;
-    const verified = filteredData.filter(o => o['Approval Status'] === 'Verified').length;
-    const rejected = filteredData.filter(o => o['Approval Status'] === 'Rejected').length;
-    
-    const ctx = document.getElementById('statusPieChart').getContext('2d');
-    
-    if (charts.statusPie) {
-        charts.statusPie.destroy();
-    }
-    
-    charts.statusPie = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: ['Verified', 'Pending', 'Rejected'],
-            datasets: [{
-                data: [verified, pending, rejected],
-                backgroundColor: [
-                    '#4caf50',
-                    '#ff9800',
-                    '#f44336'
-                ],
-                borderColor: '#ffffff',
-                borderWidth: 3
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom'
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((context.parsed / total) * 100).toFixed(1);
-                            return context.label + ': ' + formatNumber(context.parsed) + ' (' + percentage + '%)';
-                        }
-                    }
-                }
-            }
-        }
-    });
+.search-container {
+    position: relative;
+    margin-bottom: var(--spacing-md);
 }
 
-function updateCropChart() {
-    const cropAnalysis = getCropAnalysis();
-    const crops = Object.keys(cropAnalysis).sort((a, b) => cropAnalysis[b] - cropAnalysis[a]).slice(0, 10);
-    const counts = crops.map(c => cropAnalysis[c]);
-    
-    const ctx = document.getElementById('cropChart').getContext('2d');
-    
-    if (charts.crop) {
-        charts.crop.destroy();
-    }
-    
-    charts.crop = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: crops,
-            datasets: [{
-                label: 'Orders Count',
-                data: counts,
-                backgroundColor: '#4db6ac',
-                borderColor: '#00897b',
-                borderWidth: 2
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            indexAxis: 'y',
-            plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return 'Orders: ' + formatNumber(context.parsed.x);
-                        }
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    beginAtZero: true,
-                    ticks: {
-                        callback: function(value) {
-                            return formatNumber(value);
-                        }
-                    }
-                }
-            }
-        }
-    });
+.search-container i.fa-search {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+    font-size: 1.2rem;
 }
 
-function updateDistrictChart() {
-    const districtAnalysis = getDistrictAnalysis();
-    const districts = Object.keys(districtAnalysis)
-        .filter(d => d !== 'Unknown')
-        .sort((a, b) => districtAnalysis[b].totalFarmersCount - districtAnalysis[a].totalFarmersCount)
-        .slice(0, 10);
-    
-    const farmerCounts = districts.map(d => districtAnalysis[d].totalFarmersCount);
-    const winnerCounts = districts.map(d => districtAnalysis[d].winnersCount);
-    
-    const ctx = document.getElementById('districtChart').getContext('2d');
-    
-    if (charts.district) {
-        charts.district.destroy();
-    }
-    
-    charts.district = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: districts,
-            datasets: [
-                {
-                    label: 'Total Farmers',
-                    data: farmerCounts,
-                    backgroundColor: 'rgba(77, 182, 172, 0.7)',
-                    borderColor: '#4db6ac',
-                    borderWidth: 2
-                },
-                {
-                    label: 'Cashback Winners',
-                    data: winnerCounts,
-                    backgroundColor: 'rgba(0, 105, 95, 0.9)',
-                    borderColor: '#004d40',
-                    borderWidth: 2
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: true,
-                    position: 'bottom'
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return context.dataset.label + ': ' + formatNumber(context.parsed.y);
-                        }
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        callback: function(value) {
-                            return formatNumber(value);
-                        }
-                    }
-                }
-            }
-        }
-    });
+#universalSearch {
+    width: 100%;
+    padding: 1rem 3rem 1rem 3rem;
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    font-size: 1rem;
+    transition: all 0.3s ease;
 }
 
-function updateBudgetTracking() {
-    const sales = getProductSales();
-    
-    Object.keys(PRODUCT_CONFIG).forEach(product => {
-        const config = PRODUCT_CONFIG[product];
-        const productSales = sales[product];
-        const consumed = productSales.cashback;
-        const remaining = config.budget - consumed;
-        const percentage = (consumed / config.budget * 100).toFixed(1);
-        
-        const elementId = 'budget' + product.replace(/\s+/g, '');
-        const element = document.getElementById(elementId);
-        
-        if (element) {
-            const remainingSpan = element.querySelector('.budget-remaining');
-            const consumedBar = element.querySelector('.budget-consumed');
-            const stats = element.querySelectorAll('.budget-stats strong');
-            
-            remainingSpan.textContent = formatCurrency(remaining) + ' Remaining';
-            remainingSpan.style.color = remaining > 0 ? '#4caf50' : '#f44336';
-            
-            consumedBar.style.width = Math.min(percentage, 100) + '%';
-            
-            if (stats.length >= 3) {
-                stats[0].textContent = formatNumber(productSales.units);
-                stats[1].textContent = formatCurrency(consumed);
-            }
-        }
-    });
+#universalSearch:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(0, 105, 95, 0.1);
 }
 
-function updateTopRetailersTable() {
-    const retailers = getRetailerAnalysis();
-    const top10 = retailers.slice(0, 10);
-    
-    const tbody = document.getElementById('topRetailersTable');
-    
-    if (top10.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="no-data">No data available</td></tr>';
-        return;
-    }
-    
-    tbody.innerHTML = top10.map((retailer, index) => {
-        const rankClass = index < 3 ? `rank-${index + 1}` : '';
-        const medal = index < 3 ? `<span class="medal ${rankClass}">${index + 1}</span>` : index + 1;
-        
-        return `
-            <tr>
-                <td>${medal}</td>
-                <td>${retailer.rin}</td>
-                <td>${retailer.name}</td>
-                <td>${formatNumber(retailer.orders)}</td>
-                <td>${formatNumber(retailer.farmers)}</td>
-                <td>${formatNumber(retailer.totalUnits)}</td>
-                <td>${retailer.verificationRate}%</td>
-            </tr>
-        `;
-    }).join('');
+.clear-search {
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 0.5rem;
+    opacity: 0;
+    transition: opacity 0.3s ease;
 }
 
-function updateDistrictMap() {
-    const districtAnalysis = getDistrictAnalysis();
-    const districts = Object.keys(districtAnalysis)
-        .filter(d => d !== 'Unknown' && d !== '')
-        .sort((a, b) => districtAnalysis[b].winnersCount - districtAnalysis[a].winnersCount);
-    
-    const mapGrid = document.getElementById('districtMapGrid');
-    
-    if (districts.length === 0) {
-        mapGrid.innerHTML = '<p class="no-data">No district data available</p>';
-        return;
-    }
-    
-    mapGrid.innerHTML = districts.map(district => {
-        const data = districtAnalysis[district];
-        const isActive = data.winnersCount > 0;
-        
-        return `
-            <div class="district-item ${isActive ? 'active' : ''}">
-                <h4>${district}</h4>
-                <div class="district-winners">${formatNumber(data.winnersCount)}</div>
-                <div class="district-stats">Winners</div>
-                <div class="district-total">Total: ${formatNumber(data.totalFarmersCount)} farmers</div>
-            </div>
-        `;
-    }).join('');
+.clear-search.visible {
+    opacity: 1;
 }
 
-function updateAllCharts() {
-    updateKeyMetrics();
-    updateProductUnitsChart();
-    updateCashbackChart();
-    updateStatusPieChart();
-    updateCropChart();
-    updateDistrictChart();
-    updateBudgetTracking();
-    updateTopRetailersTable();
-    updateDistrictMap();
-    updateIndiaMap();
+.clear-search:hover {
+    color: var(--danger-color);
 }
 
-// ===== India Map with Leaflet =====
-let indiaMapInstance = null;
-let mapMarkers = [];
-
-// Approximate coordinates for Uttar Pradesh districts
-const UP_DISTRICTS_COORDS = {
-    'Agra': [27.1767, 78.0081],
-    'Aligarh': [27.8974, 78.0880],
-    'Allahabad': [25.4358, 81.8463],
-    'Prayagraj': [25.4358, 81.8463],
-    'Ambedkar Nagar': [26.4052, 82.6979],
-    'Amethi': [26.1590, 81.8102],
-    'Amroha': [28.9034, 78.4671],
-    'Auraiya': [26.4655, 79.5134],
-    'Azamgarh': [26.0686, 83.1840],
-    'Baghpat': [28.9465, 77.2177],
-    'Bahraich': [27.5742, 81.5947],
-    'Ballia': [25.7599, 84.1495],
-    'Balrampur': [27.4308, 82.1821],
-    'Banda': [25.4774, 80.3350],
-    'Barabanki': [26.9243, 81.1859],
-    'Bareilly': [28.3670, 79.4304],
-    'Basti': [26.7835, 82.7386],
-    'Bijnor': [29.3732, 78.1369],
-    'Budaun': [28.0296, 79.1140],
-    'Bulandshahr': [28.4055, 77.8483],
-    'Chandauli': [25.2654, 83.2720],
-    'Chitrakoot': [25.2021, 80.8893],
-    'Deoria': [26.5024, 83.7791],
-    'Etah': [27.5553, 78.6656],
-    'Etawah': [26.7855, 79.0215],
-    'Faizabad': [26.7756, 82.1454],
-    'Ayodhya': [26.7756, 82.1454],
-    'Farrukhabad': [27.3882, 79.5782],
-    'Fatehpur': [25.9301, 80.8120],
-    'Firozabad': [27.1591, 78.3957],
-    'Gautam Buddha Nagar': [28.3587, 77.5349],
-    'Noida': [28.3587, 77.5349],
-    'Ghaziabad': [28.6692, 77.4538],
-    'Ghazipur': [25.5882, 83.5775],
-    'Gonda': [27.1333, 81.9615],
-    'Gorakhpur': [26.7606, 83.3732],
-    'Hamirpur': [25.9564, 80.1521],
-    'Hapur': [28.7303, 77.7761],
-    'Hardoi': [27.3968, 80.1311],
-    'Hathras': [27.5947, 78.0436],
-    'Jalaun': [26.1446, 79.3349],
-    'Jaunpur': [25.7463, 82.6838],
-    'Jhansi': [25.4484, 78.5685],
-    'Kannauj': [27.0514, 79.9174],
-    'Kanpur Dehat': [26.4609, 79.6555],
-    'Kanpur Nagar': [26.4499, 80.3319],
-    'Kanpur': [26.4499, 80.3319],
-    'Kasganj': [27.8094, 78.6422],
-    'Kaushambi': [25.5311, 81.3784],
-    'Kheri': [27.9061, 80.7851],
-    'Lakhimpur Kheri': [27.9061, 80.7851],
-    'Kushinagar': [26.7417, 83.8938],
-    'Lalitpur': [24.6911, 78.4118],
-    'Lucknow': [26.8467, 80.9462],
-    'Maharajganj': [27.1433, 83.5608],
-    'Mahoba': [25.2920, 79.8731],
-    'Mainpuri': [27.2352, 79.0270],
-    'Mathura': [27.4924, 77.6737],
-    'Mau': [25.9417, 83.5611],
-    'Meerut': [28.9845, 77.7064],
-    'Mirzapur': [25.1460, 82.5690],
-    'Moradabad': [28.8389, 78.7378],
-    'Muzaffarnagar': [29.4727, 77.7085],
-    'Pilibhit': [28.6315, 79.8048],
-    'Pratapgarh': [25.8967, 81.9431],
-    'Raebareli': [26.2124, 81.2331],
-    'Rampur': [28.8103, 79.0252],
-    'Saharanpur': [29.9680, 77.5460],
-    'Sambhal': [28.5850, 78.5703],
-    'Sant Kabir Nagar': [26.7652, 83.0361],
-    'Shahjahanpur': [27.8800, 79.9117],
-    'Shamli': [29.4496, 77.3107],
-    'Shravasti': [27.5104, 82.0513],
-    'Siddharthnagar': [27.2555, 83.0741],
-    'Sitapur': [27.5670, 80.6820],
-    'Sonbhadra': [24.6924, 83.0679],
-    'Sultanpur': [26.2644, 82.0739],
-    'Unnao': [26.5464, 80.4880],
-    'Varanasi': [25.3176, 82.9739],
-    'Kashi': [25.3176, 82.9739]
-};
-
-function initializeIndiaMap() {
-    if (indiaMapInstance) {
-        indiaMapInstance.remove();
-    }
-    
-    // Initialize map centered on Uttar Pradesh
-    indiaMapInstance = L.map('indiaMap').setView([27.0, 80.0], 7);
-    
-    // Add OpenStreetMap tiles
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 18,
-        minZoom: 6
-    }).addTo(indiaMapInstance);
-    
-    // Add custom styling to map
-    const mapContainer = document.getElementById('indiaMap');
-    mapContainer.style.border = '2px solid #00695f';
-    mapContainer.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+.filters-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--spacing-md);
+    align-items: end;
 }
 
-function updateIndiaMap() {
-    if (!indiaMapInstance) {
-        initializeIndiaMap();
-    }
-    
-    // Clear existing markers
-    mapMarkers.forEach(marker => marker.remove());
-    mapMarkers = [];
-    
-    const districtAnalysis = getDistrictAnalysis();
-    
-    // Find max winners for scaling
-    const maxWinners = Math.max(...Object.values(districtAnalysis).map(d => d.winnersCount), 1);
-    
-    Object.keys(districtAnalysis).forEach(district => {
-        const coords = UP_DISTRICTS_COORDS[district];
-        if (!coords) return;
-        
-        const data = districtAnalysis[district];
-        const winnersCount = data.winnersCount;
-        const totalFarmers = data.totalFarmersCount;
-        const totalCashback = data.totalCashback || 0;
-        
-        // Scale marker size based on winners count
-        const baseSize = 10;
-        const maxSize = 40;
-        const size = baseSize + (winnersCount / maxWinners) * (maxSize - baseSize);
-        
-        // Color based on activity level
-        let color = '#b2dfdb'; // Low
-        if (winnersCount > maxWinners * 0.6) {
-            color = '#00695f'; // High
-        } else if (winnersCount > maxWinners * 0.3) {
-            color = '#4db6ac'; // Medium
-        }
-        
-        // Create circle marker
-        const marker = L.circleMarker(coords, {
-            radius: size / 2,
-            fillColor: color,
-            color: '#ffffff',
-            weight: 2,
-            opacity: 1,
-            fillOpacity: 0.8
-        }).addTo(indiaMapInstance);
-        
-        // Create popup content
-        const popupContent = `
-            <div style="font-family: 'Segoe UI', sans-serif; padding: 8px;">
-                <h4 style="margin: 0 0 8px 0; color: #00695f; font-size: 1.1rem;">${district}</h4>
-                <div style="font-size: 0.9rem;">
-                    <p style="margin: 4px 0;"><strong>Total Farmers:</strong> ${formatNumber(totalFarmers)}</p>
-                    <p style="margin: 4px 0; color: #00695f;"><strong>Cashback Winners:</strong> ${formatNumber(winnersCount)}</p>
-                    <p style="margin: 4px 0;"><strong>Total Orders:</strong> ${formatNumber(data.orders)}</p>
-                    <p style="margin: 4px 0; color: #ff9800;"><strong>Total Cashback:</strong> ${formatCurrency(totalCashback)}</p>
-                </div>
-            </div>
-        `;
-        
-        marker.bindPopup(popupContent);
-        
-        // Add hover effect
-        marker.on('mouseover', function() {
-            this.setStyle({
-                radius: size / 2 + 3,
-                fillOpacity: 1
-            });
-        });
-        
-        marker.on('mouseout', function() {
-            this.setStyle({
-                radius: size / 2,
-                fillOpacity: 0.8
-            });
-        });
-        
-        mapMarkers.push(marker);
-    });
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
 }
 
-// ===== Filter Functions =====
-function populateFilters() {
-    // Get unique values
-    const districts = [...new Set(allData.map(o => o['District']).filter(d => d))].sort();
-    const retailers = [...new Set(allData.map(o => o['Retailer Name']).filter(r => r))].sort();
-    
-    const crops = new Set();
-    allData.forEach(order => {
-        const cropList = order['Crops Selected'];
-        if (cropList) {
-            cropList.split(',').map(c => c.trim()).filter(c => c).forEach(crop => crops.add(crop));
-        }
-    });
-    const cropsList = [...crops].sort();
-    
-    const products = Object.keys(PRODUCT_CONFIG);
-    
-    // Populate dropdowns
-    const districtFilter = document.getElementById('districtFilter');
-    districts.forEach(district => {
-        const option = document.createElement('option');
-        option.value = district;
-        option.textContent = district;
-        districtFilter.appendChild(option);
-    });
-    
-    const cropFilter = document.getElementById('cropFilter');
-    cropsList.forEach(crop => {
-        const option = document.createElement('option');
-        option.value = crop;
-        option.textContent = crop;
-        cropFilter.appendChild(option);
-    });
-    
-    const productFilter = document.getElementById('productFilter');
-    products.forEach(product => {
-        const option = document.createElement('option');
-        option.value = product;
-        option.textContent = product;
-        productFilter.appendChild(option);
-    });
-    
-    const retailerFilter = document.getElementById('retailerFilter');
-    retailers.forEach(retailer => {
-        const option = document.createElement('option');
-        option.value = retailer;
-        option.textContent = retailer;
-        retailerFilter.appendChild(option);
-    });
+.filter-group label {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
 }
 
-function applyFilters() {
-    const searchTerm = document.getElementById('universalSearch').value.toLowerCase();
-    const startDate = document.getElementById('startDate').value;
-    const endDate = document.getElementById('endDate').value;
-    const district = document.getElementById('districtFilter').value;
-    const landAcreage = document.getElementById('landAcreageFilter').value;
-    const crop = document.getElementById('cropFilter').value;
-    const product = document.getElementById('productFilter').value;
-    const retailer = document.getElementById('retailerFilter').value;
-    
-    filteredData = allData.filter(order => {
-        // Search filter
-        if (searchTerm) {
-            const searchableText = [
-                order['Farmer Name'],
-                order['Farmer Mobile'],
-                order['Retailer Name'],
-                order['Order ID'],
-                order['RIN']
-            ].join(' ').toLowerCase();
-            
-            if (!searchableText.includes(searchTerm)) {
-                return false;
-            }
-        }
-        
-        // Date filter
-        if (startDate || endDate) {
-            const orderDate = parseDate(order['Date of Entry']);
-            if (orderDate) {
-                if (startDate && orderDate < new Date(startDate)) return false;
-                if (endDate && orderDate > new Date(endDate)) return false;
-            }
-        }
-        
-        // District filter
-        if (district && order['District'] !== district) {
-            return false;
-        }
-        
-        // Land Acreage filter
-        if (landAcreage) {
-            const acreage = parseFloat(order['Land Acreage']) || 0;
-            const [min, max] = landAcreage.split('-').map(v => v.replace('+', ''));
-            
-            if (landAcreage === '25+') {
-                if (acreage < 25) return false;
-            } else {
-                const minVal = parseFloat(min) || 0;
-                const maxVal = parseFloat(max) || Infinity;
-                if (acreage < minVal || acreage > maxVal) return false;
-            }
-        }
-        
-        // Crop filter
-        if (crop) {
-            const crops = order['Crops Selected'];
-            if (!crops || !crops.includes(crop)) {
-                return false;
-            }
-        }
-        
-        // Product filter
-        if (product) {
-            let hasProduct = false;
-            for (let i = 1; i <= 5; i++) {
-                const productName = extractProductName(order[`Product Name ${i}`]);
-                if (productName === product) {
-                    hasProduct = true;
-                    break;
-                }
-            }
-            if (!hasProduct) {
-                return false;
-            }
-        }
-        
-        // Retailer filter
-        if (retailer && order['Retailer Name'] !== retailer) {
-            return false;
-        }
-        
-        return true;
-    });
-    
-    updateAllCharts();
-    updateCascadingFilters();
+.filter-group label i {
+    color: var(--primary-color);
 }
 
-function updateCascadingFilters() {
-    // This function updates filter options based on current selection
-    // Implementing reverse cascading - each filter affects others
-    
-    const currentFilters = {
-        district: document.getElementById('districtFilter').value,
-        crop: document.getElementById('cropFilter').value,
-        product: document.getElementById('productFilter').value,
-        retailer: document.getElementById('retailerFilter').value
-    };
-    
-    // Get available options from filtered data
-    const availableDistricts = new Set(filteredData.map(o => o['District']).filter(d => d));
-    const availableCrops = new Set();
-    const availableProducts = new Set();
-    const availableRetailers = new Set(filteredData.map(o => o['Retailer Name']).filter(r => r));
-    
-    filteredData.forEach(order => {
-        // Crops
-        const crops = order['Crops Selected'];
-        if (crops) {
-            crops.split(',').map(c => c.trim()).filter(c => c).forEach(crop => availableCrops.add(crop));
-        }
-        
-        // Products
-        for (let i = 1; i <= 5; i++) {
-            const productName = extractProductName(order[`Product Name ${i}`]);
-            if (productName && PRODUCT_CONFIG[productName]) {
-                availableProducts.add(productName);
-            }
-        }
-    });
-    
-    // Update filter dropdowns while preserving current selection
-    updateFilterOptions('districtFilter', availableDistricts, currentFilters.district);
-    updateFilterOptions('cropFilter', availableCrops, currentFilters.crop);
-    updateFilterOptions('productFilter', availableProducts, currentFilters.product);
-    updateFilterOptions('retailerFilter', availableRetailers, currentFilters.retailer);
+.filter-select,
+.filter-input {
+    padding: 0.75rem;
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+    background-color: white;
 }
 
-function updateFilterOptions(filterId, availableOptions, currentValue) {
-    const select = document.getElementById(filterId);
-    const options = Array.from(select.options);
-    
-    options.forEach(option => {
-        if (option.value === '') return; // Keep "All" option
-        
-        if (availableOptions.has(option.value)) {
-            option.disabled = false;
-            option.style.display = '';
-        } else {
-            option.disabled = true;
-            option.style.display = 'none';
-        }
-    });
+.filter-select:focus,
+.filter-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(0, 105, 95, 0.1);
 }
 
-function resetFilters() {
-    document.getElementById('universalSearch').value = '';
-    document.getElementById('startDate').value = '';
-    document.getElementById('endDate').value = '';
-    document.getElementById('dateRangeFilter').value = '';
-    document.getElementById('districtFilter').value = '';
-    document.getElementById('landAcreageFilter').value = '';
-    document.getElementById('cropFilter').value = '';
-    document.getElementById('productFilter').value = '';
-    document.getElementById('retailerFilter').value = '';
-    
-    document.getElementById('clearSearch').classList.remove('visible');
-    
-    filteredData = [...allData];
-    updateAllCharts();
-    populateFilters(); // Re-enable all options
+.date-range-inputs {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
 }
 
-// ===== Download Function =====
-function downloadReport() {
-    // Create CSV content
-    let csv = 'Order ID,Date of Entry,RIN,Retailer Name,Farmer Name,Farmer Mobile,District,Crops Selected,';
-    csv += 'Approval Status,Order Value,Farmer Total Verified,Cashback Amount,Is Winner\n';
-    
-    const farmerTotals = calculateFarmerTotals();
-    
-    filteredData.forEach(order => {
-        const farmerMobile = order['Farmer Mobile'];
-        const farmerVerifiedTotal = farmerTotals[farmerMobile]?.verifiedValue || 0;
-        const orderValue = calculateOrderValue(order);
-        const cashback = calculateOrderCashback(order, farmerVerifiedTotal);
-        const isWinner = cashback > 0 ? 'Yes' : 'No';
-        
-        csv += `${order['Order ID']},`;
-        csv += `${order['Date of Entry']},`;
-        csv += `${order['RIN']},`;
-        csv += `"${order['Retailer Name']}",`;
-        csv += `"${order['Farmer Name']}",`;
-        csv += `${order['Farmer Mobile']},`;
-        csv += `${order['District']},`;
-        csv += `"${order['Crops Selected']}",`;
-        csv += `${order['Approval Status']},`;
-        csv += `${orderValue},`;
-        csv += `${farmerVerifiedTotal},`;
-        csv += `${cashback},`;
-        csv += `${isWinner}\n`;
-    });
-    
-    // Create download link
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    
-    link.setAttribute('href', url);
-    link.setAttribute('download', `yara_cashback_report_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+.date-separator {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
 }
 
-// ===== Initialize Dashboard =====
-async function initDashboard() {
-    try {
-        // Show loading overlay
-        document.getElementById('loadingOverlay').classList.remove('hidden');
-        
-        // Load CSV data
-        const response = await fetch('yara_cbc.csv');
-        const csvText = await response.text();
-        
-        // Parse data
-        allData = parseCSV(csvText);
-        filteredData = [...allData];
-        
-        // Populate filters
-        populateFilters();
-        
-        // Update dashboard
-        updateAllCharts();
-        
-        // Update last updated time
-        document.getElementById('lastUpdated').textContent = new Date().toLocaleString();
-        
-        // Hide loading overlay
-        setTimeout(() => {
-            document.getElementById('loadingOverlay').classList.add('hidden');
-        }, 500);
-        
-    } catch (error) {
-        console.error('Error initializing dashboard:', error);
-        alert('Error loading dashboard data. Please check the console for details.');
+.filter-input-hidden {
+    display: none;
+}
+
+#dateRangeFilter {
+    cursor: pointer;
+    background-color: white;
+}
+
+#dateRangeFilter:hover {
+    border-color: var(--primary-color);
+}
+
+.btn-secondary {
+    background-color: var(--text-secondary);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-xs);
+    transition: all 0.3s ease;
+}
+
+.btn-secondary:hover {
+    background-color: var(--text-primary);
+    transform: translateY(-2px);
+}
+
+/* ===== Main Dashboard ===== */
+.dashboard-main {
+    padding: var(--spacing-lg) 0;
+}
+
+/* ===== Metrics Cards ===== */
+.metrics-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.metric-card {
+    background: var(--bg-secondary);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    box-shadow: var(--shadow-md);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+}
+
+.metric-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+}
+
+.metric-card.highlight {
+    background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
+    border: 2px solid var(--info-color);
+}
+
+.metric-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    color: white;
+    flex-shrink: 0;
+}
+
+.metric-icon.blue { background: linear-gradient(135deg, #2196f3, #1976d2); }
+.metric-icon.green { background: linear-gradient(135deg, #00897b, #00695f); }
+.metric-icon.yellow { background: linear-gradient(135deg, #ffa726, #ff9800); }
+.metric-icon.success { background: linear-gradient(135deg, #66bb6a, #4caf50); }
+.metric-icon.red { background: linear-gradient(135deg, #ef5350, #f44336); }
+.metric-icon.purple { background: linear-gradient(135deg, #ab47bc, #9c27b0); }
+.metric-icon.orange { background: linear-gradient(135deg, #ff7043, #ff5722); }
+.metric-icon.teal { background: linear-gradient(135deg, #26a69a, #00897b); }
+
+.metric-content h3 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+}
+
+.metric-content p {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.metric-content small {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+}
+
+/* ===== Charts Section ===== */
+.charts-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+}
+
+.chart-card {
+    background: var(--bg-secondary);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    box-shadow: var(--shadow-md);
+    transition: all 0.3s ease;
+}
+
+.chart-card:hover {
+    box-shadow: var(--shadow-lg);
+}
+
+.chart-card.full-width {
+    grid-column: 1 / -1;
+}
+
+.chart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-md);
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 2px solid var(--border-color);
+}
+
+.chart-header h3 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.chart-header h3 i {
+    color: var(--primary-color);
+}
+
+.chart-container {
+    position: relative;
+    height: 350px;
+}
+
+/* ===== Budget Tracking ===== */
+.budget-grid {
+    display: grid;
+    gap: var(--spacing-md);
+}
+
+.budget-item {
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    border-left: 4px solid var(--primary-color);
+}
+
+.budget-product-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-sm);
+}
+
+.budget-product-header h4 {
+    font-size: 1.1rem;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.budget-remaining {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--success-color);
+}
+
+.budget-bar {
+    height: 12px;
+    background-color: #e0e0e0;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: var(--spacing-sm);
+}
+
+.budget-consumed {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+    transition: width 0.5s ease;
+    border-radius: 6px;
+}
+
+.budget-stats {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.budget-stats span {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.budget-stats strong {
+    color: var(--text-primary);
+}
+
+.budget-stats i {
+    color: var(--primary-color);
+}
+
+/* ===== Retailers Table ===== */
+.table-container {
+    overflow-x: auto;
+    border-radius: var(--radius-md);
+}
+
+.retailers-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+}
+
+.retailers-table thead {
+    background: linear-gradient(135deg, var(--primary-color), #004d40);
+    color: white;
+}
+
+.retailers-table th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.retailers-table tbody tr {
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.2s ease;
+}
+
+.retailers-table tbody tr:hover {
+    background-color: #f5f7fa;
+}
+
+.retailers-table td {
+    padding: 1rem;
+    color: var(--text-primary);
+}
+
+.retailers-table td:first-child {
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+.retailers-table .medal {
+    display: inline-block;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 30px;
+    font-weight: 700;
+    color: white;
+}
+
+.retailers-table .rank-1 { background: linear-gradient(135deg, #ffd700, #ffed4e); color: #000; }
+.retailers-table .rank-2 { background: linear-gradient(135deg, #c0c0c0, #e8e8e8); color: #000; }
+.retailers-table .rank-3 { background: linear-gradient(135deg, #cd7f32, #e89a5c); color: #fff; }
+
+.no-data {
+    text-align: center;
+    padding: 2rem !important;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+/* ===== Map Legend ===== */
+.map-legend {
+    display: flex;
+    gap: var(--spacing-md);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.map-legend span {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.map-legend i {
+    font-size: 0.7rem;
+}
+
+/* ===== India Map ===== */
+#indiaMap {
+    width: 100%;
+    height: 600px;
+    border-radius: var(--radius-md);
+    z-index: 1;
+}
+
+.leaflet-popup-content-wrapper {
+    border-radius: var(--radius-md);
+}
+
+.leaflet-popup-content h4 {
+    color: var(--primary-color);
+    margin-bottom: var(--spacing-xs);
+}
+
+/* ===== Map Visualization ===== */
+.map-container {
+    padding: var(--spacing-md) 0;
+}
+
+.map-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.district-item {
+    background: linear-gradient(135deg, #ffffff, #f8f9fa);
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    text-align: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.district-item:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--primary-color);
+}
+
+.district-item.active {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: white;
+    border-color: var(--primary-color);
+}
+
+.district-item h4 {
+    font-size: 1rem;
+    margin-bottom: var(--spacing-xs);
+    font-weight: 600;
+}
+
+.district-item .district-stats {
+    font-size: 0.85rem;
+    opacity: 0.9;
+}
+
+.district-item .district-winners {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: var(--spacing-xs) 0;
+}
+
+.district-item .district-total {
+    font-size: 0.8rem;
+    opacity: 0.8;
+}
+
+/* ===== Footer ===== */
+.dashboard-footer {
+    background: linear-gradient(135deg, var(--primary-color) 0%, #004d40 100%);
+    color: white;
+    padding: var(--spacing-md) 0;
+    text-align: center;
+    margin-top: var(--spacing-xl);
+}
+
+.dashboard-footer p {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+/* ===== Loading Overlay ===== */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    transition: opacity 0.3s ease;
+}
+
+.loading-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.loader {
+    text-align: center;
+    color: white;
+}
+
+.loader i {
+    font-size: 4rem;
+    margin-bottom: var(--spacing-md);
+}
+
+.loader p {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+/* ===== Responsive Design ===== */
+@media (max-width: 1200px) {
+    .charts-row {
+        grid-template-columns: 1fr;
     }
 }
 
-// ===== Event Listeners =====
-document.addEventListener('DOMContentLoaded', () => {
-    // Initialize dashboard
-    initDashboard();
+@media (max-width: 768px) {
+    .header-content {
+        flex-direction: column;
+        align-items: flex-start;
+    }
     
-    // Search functionality
-    const searchInput = document.getElementById('universalSearch');
-    const clearSearch = document.getElementById('clearSearch');
+    .header-text h1 {
+        font-size: 1.4rem;
+    }
     
-    searchInput.addEventListener('input', (e) => {
-        if (e.target.value) {
-            clearSearch.classList.add('visible');
-        } else {
-            clearSearch.classList.remove('visible');
-        }
-        
-        // Debounce search
-        clearTimeout(searchInput.debounceTimer);
-        searchInput.debounceTimer = setTimeout(() => {
-            applyFilters();
-        }, 300);
-    });
+    .metrics-row {
+        grid-template-columns: 1fr;
+    }
     
-    clearSearch.addEventListener('click', () => {
-        searchInput.value = '';
-        clearSearch.classList.remove('visible');
-        applyFilters();
-    });
+    .filters-container {
+        grid-template-columns: 1fr;
+    }
     
-    // Date Range Picker functionality
-    const dateRangeInput = document.getElementById('dateRangeFilter');
-    const startDateInput = document.getElementById('startDate');
-    const endDateInput = document.getElementById('endDate');
+    .metric-card {
+        padding: var(--spacing-sm);
+    }
     
-    dateRangeInput.addEventListener('click', function() {
-        // Create a simple date range modal
-        const currentStart = startDateInput.value;
-        const currentEnd = endDateInput.value;
-        
-        const modal = document.createElement('div');
-        modal.className = 'date-range-modal';
-        modal.innerHTML = `
-            <div class="date-range-modal-content">
-                <h3>Select Date Range</h3>
-                <div class="date-range-inputs-modal">
-                    <div>
-                        <label>Start Date:</label>
-                        <input type="date" id="modalStartDate" value="${currentStart}">
-                    </div>
-                    <div>
-                        <label>End Date:</label>
-                        <input type="date" id="modalEndDate" value="${currentEnd}">
-                    </div>
-                </div>
-                <div class="date-range-buttons">
-                    <button class="btn-apply" id="applyDateRange">Apply</button>
-                    <button class="btn-clear" id="clearDateRange">Clear</button>
-                    <button class="btn-cancel" id="cancelDateRange">Cancel</button>
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(modal);
-        
-        // Apply button
-        document.getElementById('applyDateRange').addEventListener('click', () => {
-            const start = document.getElementById('modalStartDate').value;
-            const end = document.getElementById('modalEndDate').value;
-            
-            startDateInput.value = start;
-            endDateInput.value = end;
-            
-            if (start && end) {
-                dateRangeInput.value = `${start} to ${end}`;
-            } else if (start) {
-                dateRangeInput.value = `From ${start}`;
-            } else if (end) {
-                dateRangeInput.value = `Until ${end}`;
-            } else {
-                dateRangeInput.value = '';
-            }
-            
-            applyFilters();
-            document.body.removeChild(modal);
-        });
-        
-        // Clear button
-        document.getElementById('clearDateRange').addEventListener('click', () => {
-            startDateInput.value = '';
-            endDateInput.value = '';
-            dateRangeInput.value = '';
-            applyFilters();
-            document.body.removeChild(modal);
-        });
-        
-        // Cancel button
-        document.getElementById('cancelDateRange').addEventListener('click', () => {
-            document.body.removeChild(modal);
-        });
-        
-        // Close on outside click
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                document.body.removeChild(modal);
-            }
-        });
-    });
+    .metric-icon {
+        width: 50px;
+        height: 50px;
+        font-size: 1.5rem;
+    }
     
-    // Filter listeners
-    document.getElementById('districtFilter').addEventListener('change', applyFilters);
-    document.getElementById('landAcreageFilter').addEventListener('change', applyFilters);
-    document.getElementById('cropFilter').addEventListener('change', applyFilters);
-    document.getElementById('productFilter').addEventListener('change', applyFilters);
-    document.getElementById('retailerFilter').addEventListener('change', applyFilters);
+    .metric-content h3 {
+        font-size: 1.5rem;
+    }
     
-    // Reset filters
-    document.getElementById('resetFilters').addEventListener('click', resetFilters);
+    .chart-container {
+        height: 250px;
+    }
     
-    // Download report
-    document.getElementById('downloadBtn').addEventListener('click', downloadReport);
-});
+    .map-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    }
+    
+    #indiaMap {
+        height: 400px;
+    }
+    
+    .date-range-modal-content {
+        min-width: 300px;
+        padding: var(--spacing-md);
+    }
+    
+    .map-legend {
+        flex-direction: column;
+        gap: var(--spacing-xs);
+    }
+}
+
+@media (max-width: 480px) {
+    .logo {
+        height: 40px;
+    }
+    
+    .header-text h1 {
+        font-size: 1.2rem;
+    }
+    
+    .subtitle {
+        font-size: 0.8rem;
+    }
+    
+    .btn-primary {
+        padding: 0.6rem 1rem;
+        font-size: 0.9rem;
+    }
+    
+    .chart-card {
+        padding: var(--spacing-md);
+    }
+    
+    .retailers-table {
+        font-size: 0.85rem;
+    }
+    
+    .retailers-table th,
+    .retailers-table td {
+        padding: 0.75rem 0.5rem;
+    }
+}
+
+/* ===== Animations ===== */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.metric-card,
+.chart-card {
+    animation: fadeIn 0.5s ease forwards;
+}
+
+.metric-card:nth-child(1) { animation-delay: 0.1s; }
+.metric-card:nth-child(2) { animation-delay: 0.2s; }
+.metric-card:nth-child(3) { animation-delay: 0.3s; }
+.metric-card:nth-child(4) { animation-delay: 0.4s; }
+.metric-card:nth-child(5) { animation-delay: 0.5s; }
+
+/* ===== Print Styles ===== */
+@media print {
+    .dashboard-header,
+    .controls-section,
+    .dashboard-footer,
+    .loading-overlay {
+        display: none;
+    }
+    
+    body {
+        background: white;
+    }
+    
+    .chart-card {
+        break-inside: avoid;
+        box-shadow: none;
+        border: 1px solid var(--border-color);
+    }
+}
+
+/* ===== Date Range Modal ===== */
+.date-range-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    animation: fadeIn 0.2s ease;
+}
+
+.date-range-modal-content {
+    background: white;
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    min-width: 400px;
+    max-width: 90%;
+}
+
+.date-range-modal-content h3 {
+    margin-bottom: var(--spacing-md);
+    color: var(--primary-color);
+    font-size: 1.3rem;
+}
+
+.date-range-inputs-modal {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.date-range-inputs-modal label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: var(--spacing-xs);
+    color: var(--text-secondary);
+}
+
+.date-range-inputs-modal input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: 1rem;
+}
+
+.date-range-buttons {
+    display: flex;
+    gap: var(--spacing-sm);
+    justify-content: flex-end;
+}
+
+.date-range-buttons button {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-apply {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.btn-apply:hover {
+    background-color: #004d40;
+}
+
+.btn-clear {
+    background-color: var(--warning-color);
+    color: white;
+}
+
+.btn-clear:hover {
+    background-color: #f57c00;
+}
+
+.btn-cancel {
+    background-color: var(--text-secondary);
+    color: white;
+}
+
+.btn-cancel:hover {
+    background-color: var(--text-primary);
+}
+
+/* ===== Utility Classes ===== */
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.text-left { text-align: left; }
+
+.mt-1 { margin-top: var(--spacing-xs); }
+.mt-2 { margin-top: var(--spacing-sm); }
+.mt-3 { margin-top: var(--spacing-md); }
+
+.mb-1 { margin-bottom: var(--spacing-xs); }
+.mb-2 { margin-bottom: var(--spacing-sm); }
+.mb-3 { margin-bottom: var(--spacing-md); }
