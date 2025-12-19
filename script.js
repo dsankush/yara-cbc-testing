@@ -2,6 +2,8 @@
 let allData = [];
 let filteredData = [];
 let charts = {};
+let indiaMapInstance = null;
+let mapMarkers = [];
 
 // Product configuration with pricing and cashback info
 const PRODUCT_CONFIG = {
@@ -39,14 +41,27 @@ const PRODUCT_CONFIG = {
 
 const CASHBACK_THRESHOLD = 10000;
 
+// Approximate coordinates for Uttar Pradesh districts
+const UP_DISTRICTS_COORDS = {
+    'Agra': [27.1767, 78.0081],
+    'Aligarh': [27.8974, 78.0880],
+    'Amroha': [28.9034, 78.4671],
+    'Moradabad': [28.8389, 78.7378],
+    'Bareilly': [28.3670, 79.4304],
+    'Meerut': [28.9845, 77.7064],
+    'Ghaziabad': [28.6692, 77.4538],
+    'Bulandshahr': [28.4055, 77.8483],
+    'Gautam Buddha Nagar': [28.3587, 77.5349],
+    'Noida': [28.3587, 77.5349]
+};
+
 // ===== Utility Functions =====
 function parseCSV(csvText) {
-    const lines = csvText.split('\n');
+    const lines = csvText.trim().split('\n');
     const headers = lines[0].split(',').map(h => h.trim());
     const data = [];
     
-    let i = 1;
-    while (i < lines.length) {
+    for (let i = 1; i < lines.length; i++) {
         let currentLine = lines[i];
         let row = [];
         let inQuotes = false;
@@ -94,8 +109,6 @@ function parseCSV(csvText) {
             });
             data.push(rowData);
         }
-        
-        i++;
     }
     
     return data;
@@ -104,16 +117,17 @@ function parseCSV(csvText) {
 function extractProductName(productString) {
     if (!productString) return '';
     
-    // Extract product name before "Cashback Amount"
-    const match = productString.match(/^(.*?)\s*(?:Cashback Amount|$)/);
-    return match ? match[1].trim() : productString.trim();
+    // Remove quotes and extract product name before "Cashback Amount"
+    const cleanString = productString.replace(/^["']|["']$/g, '').trim();
+    const match = cleanString.match(/^(.*?)\s*(?:Cashback Amount|$)/i);
+    return match ? match[1].trim() : cleanString;
 }
 
 function extractCashbackAmount(productString) {
     if (!productString) return 0;
     
     // Extract cashback amount from the string like "YaraLiva Nitrabor \n Cashback Amount : ₹25"
-    const match = productString.match(/Cashback Amount\s*:\s*₹(\d+)/i);
+    const match = productString.match(/Cashback Amount\s*[:：]\s*₹?(\d+)/i);
     return match ? parseInt(match[1]) : 0;
 }
 
@@ -133,11 +147,11 @@ function parseDate(dateString) {
 }
 
 function formatCurrency(amount) {
-    return '₹' + amount.toLocaleString('en-IN');
+    return '₹' + Math.round(amount).toLocaleString('en-IN');
 }
 
 function formatNumber(num) {
-    return num.toLocaleString('en-IN');
+    return Math.round(num).toLocaleString('en-IN');
 }
 
 // ===== Data Processing Functions =====
@@ -145,20 +159,58 @@ function calculateOrderValue(order) {
     let totalValue = 0;
     
     for (let i = 1; i <= 5; i++) {
-        const productName = extractProductName(order[`Product Name ${i}`]);
+        const productString = order[`Product Name ${i}`];
         const quantity = parseInt(order[`Product Quantity ${i}`]) || 0;
         
-        if (productName && PRODUCT_CONFIG[productName]) {
-            totalValue += PRODUCT_CONFIG[productName].price * quantity;
+        if (productString && quantity > 0) {
+            const productName = extractProductName(productString);
+            
+            if (PRODUCT_CONFIG[productName]) {
+                totalValue += PRODUCT_CONFIG[productName].price * quantity;
+            }
         }
     }
     
     return totalValue;
 }
 
-function calculateOrderCashback(order, farmerTotalValue) {
+function calculateFarmerTotals() {
+    const farmerTotals = {};
+    
+    // First pass: calculate total verified value per farmer
+    filteredData.forEach(order => {
+        const farmerMobile = order['Farmer Mobile'];
+        const isVerified = order['Approval Status']?.trim() === 'Verified';
+        
+        if (!farmerMobile) return;
+        
+        if (!farmerTotals[farmerMobile]) {
+            farmerTotals[farmerMobile] = {
+                totalValue: 0,
+                verifiedValue: 0,
+                orders: [],
+                verifiedOrders: 0
+            };
+        }
+        
+        const orderValue = calculateOrderValue(order);
+        farmerTotals[farmerMobile].totalValue += orderValue;
+        farmerTotals[farmerMobile].orders.push(order);
+        
+        if (isVerified) {
+            farmerTotals[farmerMobile].verifiedValue += orderValue;
+            farmerTotals[farmerMobile].verifiedOrders++;
+        }
+    });
+    
+    return farmerTotals;
+}
+
+function calculateOrderCashback(order, farmerVerifiedTotal) {
     // Only eligible if farmer's total verified value >= 10000 and this order status is Verified
-    if (farmerTotalValue < CASHBACK_THRESHOLD || order['Approval Status'] !== 'Verified') {
+    const isVerified = order['Approval Status']?.trim() === 'Verified';
+    
+    if (farmerVerifiedTotal < CASHBACK_THRESHOLD || !isVerified) {
         return 0;
     }
     
@@ -168,52 +220,23 @@ function calculateOrderCashback(order, farmerTotalValue) {
         const productString = order[`Product Name ${i}`];
         const quantity = parseInt(order[`Product Quantity ${i}`]) || 0;
         
-        if (productString) {
+        if (productString && quantity > 0) {
             // Try to extract cashback from the product string first
-            const cashbackFromString = extractCashbackAmount(productString);
+            let cashbackPerUnit = extractCashbackAmount(productString);
             
-            if (cashbackFromString > 0) {
-                totalCashback += cashbackFromString * quantity;
-            } else {
-                // Fallback to product config
+            // Fallback to product config if not found in string
+            if (cashbackPerUnit === 0) {
                 const productName = extractProductName(productString);
-                if (productName && PRODUCT_CONFIG[productName]) {
-                    totalCashback += PRODUCT_CONFIG[productName].cashback * quantity;
+                if (PRODUCT_CONFIG[productName]) {
+                    cashbackPerUnit = PRODUCT_CONFIG[productName].cashback;
                 }
             }
+            
+            totalCashback += cashbackPerUnit * quantity;
         }
     }
     
     return totalCashback;
-}
-
-function calculateFarmerTotals() {
-    const farmerTotals = {};
-    
-    // First pass: calculate total verified value per farmer
-    filteredData.forEach(order => {
-        const farmerMobile = order['Farmer Mobile'];
-        const isVerified = order['Approval Status'] === 'Verified';
-        
-        if (!farmerTotals[farmerMobile]) {
-            farmerTotals[farmerMobile] = {
-                totalValue: 0,
-                verifiedValue: 0,
-                orders: []
-            };
-        }
-        
-        const orderValue = calculateOrderValue(order);
-        farmerTotals[farmerMobile].totalValue += orderValue;
-        
-        if (isVerified) {
-            farmerTotals[farmerMobile].verifiedValue += orderValue;
-        }
-        
-        farmerTotals[farmerMobile].orders.push(order);
-    });
-    
-    return farmerTotals;
 }
 
 function getProductSales() {
@@ -229,28 +252,25 @@ function getProductSales() {
         const farmerMobile = order['Farmer Mobile'];
         const farmerVerifiedTotal = farmerTotals[farmerMobile]?.verifiedValue || 0;
         const orderCashback = calculateOrderCashback(order, farmerVerifiedTotal);
-        const isWinner = orderCashback > 0;
         
         for (let i = 1; i <= 5; i++) {
             const productString = order[`Product Name ${i}`];
             const quantity = parseInt(order[`Product Quantity ${i}`]) || 0;
             
-            if (productString) {
+            if (productString && quantity > 0) {
                 const productName = extractProductName(productString);
                 
                 if (productName && sales[productName]) {
                     sales[productName].units += quantity;
                     sales[productName].orders++;
                     
-                    if (isWinner) {
-                        // Try to get cashback from string first, then fallback to config
-                        const cashbackFromString = extractCashbackAmount(productString);
-                        
-                        if (cashbackFromString > 0) {
-                            sales[productName].cashback += cashbackFromString * quantity;
-                        } else if (PRODUCT_CONFIG[productName]) {
-                            sales[productName].cashback += PRODUCT_CONFIG[productName].cashback * quantity;
+                    if (orderCashback > 0) {
+                        // Get cashback for this specific product in this order
+                        let cashbackPerUnit = extractCashbackAmount(productString);
+                        if (cashbackPerUnit === 0 && PRODUCT_CONFIG[productName]) {
+                            cashbackPerUnit = PRODUCT_CONFIG[productName].cashback;
                         }
+                        sales[productName].cashback += cashbackPerUnit * quantity;
                     }
                 }
             }
@@ -266,7 +286,6 @@ function getCropAnalysis() {
     filteredData.forEach(order => {
         const crops = order['Crops Selected'];
         if (crops) {
-            // Split by comma and trim
             const cropList = crops.split(',').map(c => c.trim()).filter(c => c);
             cropList.forEach(crop => {
                 cropCounts[crop] = (cropCounts[crop] || 0) + 1;
@@ -282,11 +301,10 @@ function getDistrictAnalysis() {
     const farmerTotals = calculateFarmerTotals();
     
     filteredData.forEach(order => {
-        const district = order['District'] || 'Unknown';
+        const district = order['District']?.trim() || 'Unknown';
         const farmerMobile = order['Farmer Mobile'];
         const farmerVerifiedTotal = farmerTotals[farmerMobile]?.verifiedValue || 0;
         const orderCashback = calculateOrderCashback(order, farmerVerifiedTotal);
-        const isWinner = orderCashback > 0;
         
         if (!districtData[district]) {
             districtData[district] = {
@@ -300,7 +318,7 @@ function getDistrictAnalysis() {
         districtData[district].totalFarmers.add(farmerMobile);
         districtData[district].orders++;
         
-        if (isWinner) {
+        if (orderCashback > 0) {
             districtData[district].winners.add(farmerMobile);
             districtData[district].totalCashback += orderCashback;
         }
@@ -322,7 +340,9 @@ function getRetailerAnalysis() {
         const rin = order['RIN'];
         const retailerName = order['Retailer Name'];
         const farmerMobile = order['Farmer Mobile'];
-        const status = order['Approval Status'];
+        const status = order['Approval Status']?.trim();
+        
+        if (!rin) return;
         
         if (!retailerData[rin]) {
             retailerData[rin] = {
@@ -359,7 +379,7 @@ function getRetailerAnalysis() {
         verificationRate: (retailerData[rin].verified / retailerData[rin].orders * 100).toFixed(1)
     }));
     
-    // Sort by orders
+    // Sort by orders descending
     retailers.sort((a, b) => b.orders - a.orders);
     
     return retailers;
@@ -371,13 +391,13 @@ function updateKeyMetrics() {
     document.getElementById('totalScans').textContent = formatNumber(filteredData.length);
     
     // Unique farmers
-    const uniqueFarmers = new Set(filteredData.map(o => o['Farmer Mobile'])).size;
+    const uniqueFarmers = new Set(filteredData.map(o => o['Farmer Mobile']).filter(m => m)).size;
     document.getElementById('uniqueFarmers').textContent = formatNumber(uniqueFarmers);
     
-    // Status counts - Count based on Approval Status column
-    const pending = filteredData.filter(o => o['Approval Status'] === 'Pending').length;
-    const verified = filteredData.filter(o => o['Approval Status'] === 'Verified').length;
-    const rejected = filteredData.filter(o => o['Approval Status'] === 'Rejected').length;
+    // Status counts - DIRECTLY from Approval Status column
+    const pending = filteredData.filter(o => o['Approval Status']?.trim() === 'Pending').length;
+    const verified = filteredData.filter(o => o['Approval Status']?.trim() === 'Verified').length;
+    const rejected = filteredData.filter(o => o['Approval Status']?.trim() === 'Rejected').length;
     
     document.getElementById('pendingCount').textContent = formatNumber(pending);
     document.getElementById('verifiedCount').textContent = formatNumber(verified);
@@ -403,7 +423,7 @@ function updateKeyMetrics() {
     document.getElementById('totalCashback').textContent = formatCurrency(totalCashback);
     
     // Active retailers
-    const activeRetailers = new Set(filteredData.map(o => o['RIN'])).size;
+    const activeRetailers = new Set(filteredData.map(o => o['RIN']).filter(r => r)).size;
     document.getElementById('activeRetailers').textContent = formatNumber(activeRetailers);
 }
 
@@ -524,9 +544,9 @@ function updateCashbackChart() {
 }
 
 function updateStatusPieChart() {
-    const pending = filteredData.filter(o => o['Approval Status'] === 'Pending').length;
-    const verified = filteredData.filter(o => o['Approval Status'] === 'Verified').length;
-    const rejected = filteredData.filter(o => o['Approval Status'] === 'Rejected').length;
+    const pending = filteredData.filter(o => o['Approval Status']?.trim() === 'Pending').length;
+    const verified = filteredData.filter(o => o['Approval Status']?.trim() === 'Verified').length;
+    const rejected = filteredData.filter(o => o['Approval Status']?.trim() === 'Rejected').length;
     
     const ctx = document.getElementById('statusPieChart').getContext('2d');
     
@@ -560,7 +580,7 @@ function updateStatusPieChart() {
                     callbacks: {
                         label: function(context) {
                             const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((context.parsed / total) * 100).toFixed(1);
+                            const percentage = total > 0 ? ((context.parsed / total) * 100).toFixed(1) : 0;
                             return context.label + ': ' + formatNumber(context.parsed) + ' (' + percentage + '%)';
                         }
                     }
@@ -626,7 +646,7 @@ function updateCropChart() {
 function updateDistrictChart() {
     const districtAnalysis = getDistrictAnalysis();
     const districts = Object.keys(districtAnalysis)
-        .filter(d => d !== 'Unknown')
+        .filter(d => d !== 'Unknown' && d !== '')
         .sort((a, b) => districtAnalysis[b].totalFarmersCount - districtAnalysis[a].totalFarmersCount)
         .slice(0, 10);
     
@@ -778,135 +798,56 @@ function updateDistrictMap() {
     }).join('');
 }
 
-function updateAllCharts() {
-    updateKeyMetrics();
-    updateProductUnitsChart();
-    updateCashbackChart();
-    updateStatusPieChart();
-    updateCropChart();
-    updateDistrictChart();
-    updateBudgetTracking();
-    updateTopRetailersTable();
-    updateDistrictMap();
-    updateIndiaMap();
-}
-
 // ===== India Map with Leaflet =====
-let indiaMapInstance = null;
-let mapMarkers = [];
-
-// Approximate coordinates for Uttar Pradesh districts
-const UP_DISTRICTS_COORDS = {
-    'Agra': [27.1767, 78.0081],
-    'Aligarh': [27.8974, 78.0880],
-    'Allahabad': [25.4358, 81.8463],
-    'Prayagraj': [25.4358, 81.8463],
-    'Ambedkar Nagar': [26.4052, 82.6979],
-    'Amethi': [26.1590, 81.8102],
-    'Amroha': [28.9034, 78.4671],
-    'Auraiya': [26.4655, 79.5134],
-    'Azamgarh': [26.0686, 83.1840],
-    'Baghpat': [28.9465, 77.2177],
-    'Bahraich': [27.5742, 81.5947],
-    'Ballia': [25.7599, 84.1495],
-    'Balrampur': [27.4308, 82.1821],
-    'Banda': [25.4774, 80.3350],
-    'Barabanki': [26.9243, 81.1859],
-    'Bareilly': [28.3670, 79.4304],
-    'Basti': [26.7835, 82.7386],
-    'Bijnor': [29.3732, 78.1369],
-    'Budaun': [28.0296, 79.1140],
-    'Bulandshahr': [28.4055, 77.8483],
-    'Chandauli': [25.2654, 83.2720],
-    'Chitrakoot': [25.2021, 80.8893],
-    'Deoria': [26.5024, 83.7791],
-    'Etah': [27.5553, 78.6656],
-    'Etawah': [26.7855, 79.0215],
-    'Faizabad': [26.7756, 82.1454],
-    'Ayodhya': [26.7756, 82.1454],
-    'Farrukhabad': [27.3882, 79.5782],
-    'Fatehpur': [25.9301, 80.8120],
-    'Firozabad': [27.1591, 78.3957],
-    'Gautam Buddha Nagar': [28.3587, 77.5349],
-    'Noida': [28.3587, 77.5349],
-    'Ghaziabad': [28.6692, 77.4538],
-    'Ghazipur': [25.5882, 83.5775],
-    'Gonda': [27.1333, 81.9615],
-    'Gorakhpur': [26.7606, 83.3732],
-    'Hamirpur': [25.9564, 80.1521],
-    'Hapur': [28.7303, 77.7761],
-    'Hardoi': [27.3968, 80.1311],
-    'Hathras': [27.5947, 78.0436],
-    'Jalaun': [26.1446, 79.3349],
-    'Jaunpur': [25.7463, 82.6838],
-    'Jhansi': [25.4484, 78.5685],
-    'Kannauj': [27.0514, 79.9174],
-    'Kanpur Dehat': [26.4609, 79.6555],
-    'Kanpur Nagar': [26.4499, 80.3319],
-    'Kanpur': [26.4499, 80.3319],
-    'Kasganj': [27.8094, 78.6422],
-    'Kaushambi': [25.5311, 81.3784],
-    'Kheri': [27.9061, 80.7851],
-    'Lakhimpur Kheri': [27.9061, 80.7851],
-    'Kushinagar': [26.7417, 83.8938],
-    'Lalitpur': [24.6911, 78.4118],
-    'Lucknow': [26.8467, 80.9462],
-    'Maharajganj': [27.1433, 83.5608],
-    'Mahoba': [25.2920, 79.8731],
-    'Mainpuri': [27.2352, 79.0270],
-    'Mathura': [27.4924, 77.6737],
-    'Mau': [25.9417, 83.5611],
-    'Meerut': [28.9845, 77.7064],
-    'Mirzapur': [25.1460, 82.5690],
-    'Moradabad': [28.8389, 78.7378],
-    'Muzaffarnagar': [29.4727, 77.7085],
-    'Pilibhit': [28.6315, 79.8048],
-    'Pratapgarh': [25.8967, 81.9431],
-    'Raebareli': [26.2124, 81.2331],
-    'Rampur': [28.8103, 79.0252],
-    'Saharanpur': [29.9680, 77.5460],
-    'Sambhal': [28.5850, 78.5703],
-    'Sant Kabir Nagar': [26.7652, 83.0361],
-    'Shahjahanpur': [27.8800, 79.9117],
-    'Shamli': [29.4496, 77.3107],
-    'Shravasti': [27.5104, 82.0513],
-    'Siddharthnagar': [27.2555, 83.0741],
-    'Sitapur': [27.5670, 80.6820],
-    'Sonbhadra': [24.6924, 83.0679],
-    'Sultanpur': [26.2644, 82.0739],
-    'Unnao': [26.5464, 80.4880],
-    'Varanasi': [25.3176, 82.9739],
-    'Kashi': [25.3176, 82.9739]
-};
-
 function initializeIndiaMap() {
-    if (indiaMapInstance) {
-        indiaMapInstance.remove();
+    const mapElement = document.getElementById('indiaMap');
+    if (!mapElement) {
+        console.error('Map element not found');
+        return;
     }
     
-    // Initialize map centered on Uttar Pradesh
-    indiaMapInstance = L.map('indiaMap').setView([27.0, 80.0], 7);
+    if (indiaMapInstance) {
+        indiaMapInstance.remove();
+        indiaMapInstance = null;
+    }
     
-    // Add OpenStreetMap tiles
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 18,
-        minZoom: 6
-    }).addTo(indiaMapInstance);
-    
-    // Add custom styling to map
-    const mapContainer = document.getElementById('indiaMap');
-    mapContainer.style.border = '2px solid #00695f';
-    mapContainer.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+    try {
+        // Initialize map centered on Uttar Pradesh
+        indiaMapInstance = L.map('indiaMap').setView([27.0, 80.0], 7);
+        
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 18,
+            minZoom: 6
+        }).addTo(indiaMapInstance);
+        
+        // Add custom styling to map
+        mapElement.style.border = '2px solid #00695f';
+        mapElement.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+        
+        console.log('Map initialized successfully');
+    } catch (error) {
+        console.error('Error initializing map:', error);
+    }
 }
 
 function updateIndiaMap() {
     if (!indiaMapInstance) {
         initializeIndiaMap();
+        // Wait a bit for map to initialize
+        setTimeout(updateIndiaMap, 500);
+        return;
     }
     
     // Clear existing markers
-    mapMarkers.forEach(marker => marker.remove());
+    mapMarkers.forEach(marker => {
+        try {
+            marker.remove();
+        } catch (e) {
+            console.error('Error removing marker:', e);
+        }
+    });
     mapMarkers = [];
     
     const districtAnalysis = getDistrictAnalysis();
@@ -936,48 +877,65 @@ function updateIndiaMap() {
             color = '#4db6ac'; // Medium
         }
         
-        // Create circle marker
-        const marker = L.circleMarker(coords, {
-            radius: size / 2,
-            fillColor: color,
-            color: '#ffffff',
-            weight: 2,
-            opacity: 1,
-            fillOpacity: 0.8
-        }).addTo(indiaMapInstance);
-        
-        // Create popup content
-        const popupContent = `
-            <div style="font-family: 'Segoe UI', sans-serif; padding: 8px;">
-                <h4 style="margin: 0 0 8px 0; color: #00695f; font-size: 1.1rem;">${district}</h4>
-                <div style="font-size: 0.9rem;">
-                    <p style="margin: 4px 0;"><strong>Total Farmers:</strong> ${formatNumber(totalFarmers)}</p>
-                    <p style="margin: 4px 0; color: #00695f;"><strong>Cashback Winners:</strong> ${formatNumber(winnersCount)}</p>
-                    <p style="margin: 4px 0;"><strong>Total Orders:</strong> ${formatNumber(data.orders)}</p>
-                    <p style="margin: 4px 0; color: #ff9800;"><strong>Total Cashback:</strong> ${formatCurrency(totalCashback)}</p>
-                </div>
-            </div>
-        `;
-        
-        marker.bindPopup(popupContent);
-        
-        // Add hover effect
-        marker.on('mouseover', function() {
-            this.setStyle({
-                radius: size / 2 + 3,
-                fillOpacity: 1
-            });
-        });
-        
-        marker.on('mouseout', function() {
-            this.setStyle({
+        try {
+            // Create circle marker
+            const marker = L.circleMarker(coords, {
                 radius: size / 2,
+                fillColor: color,
+                color: '#ffffff',
+                weight: 2,
+                opacity: 1,
                 fillOpacity: 0.8
+            }).addTo(indiaMapInstance);
+            
+            // Create popup content
+            const popupContent = `
+                <div style="font-family: 'Segoe UI', sans-serif; padding: 8px;">
+                    <h4 style="margin: 0 0 8px 0; color: #00695f; font-size: 1.1rem;">${district}</h4>
+                    <div style="font-size: 0.9rem;">
+                        <p style="margin: 4px 0;"><strong>Total Farmers:</strong> ${formatNumber(totalFarmers)}</p>
+                        <p style="margin: 4px 0; color: #00695f;"><strong>Cashback Winners:</strong> ${formatNumber(winnersCount)}</p>
+                        <p style="margin: 4px 0;"><strong>Total Orders:</strong> ${formatNumber(data.orders)}</p>
+                        <p style="margin: 4px 0; color: #ff9800;"><strong>Total Cashback:</strong> ${formatCurrency(totalCashback)}</p>
+                    </div>
+                </div>
+            `;
+            
+            marker.bindPopup(popupContent);
+            
+            // Add hover effect
+            marker.on('mouseover', function() {
+                this.setStyle({
+                    radius: size / 2 + 3,
+                    fillOpacity: 1
+                });
             });
-        });
-        
-        mapMarkers.push(marker);
+            
+            marker.on('mouseout', function() {
+                this.setStyle({
+                    radius: size / 2,
+                    fillOpacity: 0.8
+                });
+            });
+            
+            mapMarkers.push(marker);
+        } catch (error) {
+            console.error('Error creating marker for', district, ':', error);
+        }
     });
+}
+
+function updateAllCharts() {
+    updateKeyMetrics();
+    updateProductUnitsChart();
+    updateCashbackChart();
+    updateStatusPieChart();
+    updateCropChart();
+    updateDistrictChart();
+    updateBudgetTracking();
+    updateTopRetailersTable();
+    updateDistrictMap();
+    updateIndiaMap();
 }
 
 // ===== Filter Functions =====
@@ -1067,22 +1025,18 @@ function applyFilters() {
         }
         
         // District filter
-        if (district && order['District'] !== district) {
+        if (district && order['District']?.trim() !== district) {
             return false;
         }
         
         // Land Acreage filter
         if (landAcreage) {
             const acreage = parseFloat(order['Land Acreage']) || 0;
-            const [min, max] = landAcreage.split('-').map(v => v.replace('+', ''));
             
-            if (landAcreage === '25+') {
-                if (acreage < 25) return false;
-            } else {
-                const minVal = parseFloat(min) || 0;
-                const maxVal = parseFloat(max) || Infinity;
-                if (acreage < minVal || acreage > maxVal) return false;
-            }
+            if (landAcreage === '0-5' && (acreage < 0 || acreage > 5)) return false;
+            if (landAcreage === '5-10' && (acreage < 5 || acreage > 10)) return false;
+            if (landAcreage === '10-25' && (acreage < 10 || acreage > 25)) return false;
+            if (landAcreage === '25+' && acreage < 25) return false;
         }
         
         // Crop filter
@@ -1117,64 +1071,6 @@ function applyFilters() {
     });
     
     updateAllCharts();
-    updateCascadingFilters();
-}
-
-function updateCascadingFilters() {
-    // This function updates filter options based on current selection
-    // Implementing reverse cascading - each filter affects others
-    
-    const currentFilters = {
-        district: document.getElementById('districtFilter').value,
-        crop: document.getElementById('cropFilter').value,
-        product: document.getElementById('productFilter').value,
-        retailer: document.getElementById('retailerFilter').value
-    };
-    
-    // Get available options from filtered data
-    const availableDistricts = new Set(filteredData.map(o => o['District']).filter(d => d));
-    const availableCrops = new Set();
-    const availableProducts = new Set();
-    const availableRetailers = new Set(filteredData.map(o => o['Retailer Name']).filter(r => r));
-    
-    filteredData.forEach(order => {
-        // Crops
-        const crops = order['Crops Selected'];
-        if (crops) {
-            crops.split(',').map(c => c.trim()).filter(c => c).forEach(crop => availableCrops.add(crop));
-        }
-        
-        // Products
-        for (let i = 1; i <= 5; i++) {
-            const productName = extractProductName(order[`Product Name ${i}`]);
-            if (productName && PRODUCT_CONFIG[productName]) {
-                availableProducts.add(productName);
-            }
-        }
-    });
-    
-    // Update filter dropdowns while preserving current selection
-    updateFilterOptions('districtFilter', availableDistricts, currentFilters.district);
-    updateFilterOptions('cropFilter', availableCrops, currentFilters.crop);
-    updateFilterOptions('productFilter', availableProducts, currentFilters.product);
-    updateFilterOptions('retailerFilter', availableRetailers, currentFilters.retailer);
-}
-
-function updateFilterOptions(filterId, availableOptions, currentValue) {
-    const select = document.getElementById(filterId);
-    const options = Array.from(select.options);
-    
-    options.forEach(option => {
-        if (option.value === '') return; // Keep "All" option
-        
-        if (availableOptions.has(option.value)) {
-            option.disabled = false;
-            option.style.display = '';
-        } else {
-            option.disabled = true;
-            option.style.display = 'none';
-        }
-    });
 }
 
 function resetFilters() {
@@ -1192,7 +1088,6 @@ function resetFilters() {
     
     filteredData = [...allData];
     updateAllCharts();
-    populateFilters(); // Re-enable all options
 }
 
 // ===== Download Function =====
@@ -1253,11 +1148,19 @@ async function initDashboard() {
         allData = parseCSV(csvText);
         filteredData = [...allData];
         
+        console.log('Data loaded:', allData.length, 'rows');
+        
         // Populate filters
         populateFilters();
         
         // Update dashboard
         updateAllCharts();
+        
+        // Initialize map after a short delay to ensure DOM is ready
+        setTimeout(() => {
+            initializeIndiaMap();
+            updateIndiaMap();
+        }, 1000);
         
         // Update last updated time
         document.getElementById('lastUpdated').textContent = new Date().toLocaleString();
@@ -1270,6 +1173,7 @@ async function initDashboard() {
     } catch (error) {
         console.error('Error initializing dashboard:', error);
         alert('Error loading dashboard data. Please check the console for details.');
+        document.getElementById('loadingOverlay').classList.add('hidden');
     }
 }
 
@@ -1302,83 +1206,34 @@ document.addEventListener('DOMContentLoaded', () => {
         applyFilters();
     });
     
-    // Date Range Picker functionality
+    // Date Range functionality - simple version
     const dateRangeInput = document.getElementById('dateRangeFilter');
     const startDateInput = document.getElementById('startDate');
     const endDateInput = document.getElementById('endDate');
     
     dateRangeInput.addEventListener('click', function() {
-        // Create a simple date range modal
         const currentStart = startDateInput.value;
         const currentEnd = endDateInput.value;
         
-        const modal = document.createElement('div');
-        modal.className = 'date-range-modal';
-        modal.innerHTML = `
-            <div class="date-range-modal-content">
-                <h3>Select Date Range</h3>
-                <div class="date-range-inputs-modal">
-                    <div>
-                        <label>Start Date:</label>
-                        <input type="date" id="modalStartDate" value="${currentStart}">
-                    </div>
-                    <div>
-                        <label>End Date:</label>
-                        <input type="date" id="modalEndDate" value="${currentEnd}">
-                    </div>
-                </div>
-                <div class="date-range-buttons">
-                    <button class="btn-apply" id="applyDateRange">Apply</button>
-                    <button class="btn-clear" id="clearDateRange">Clear</button>
-                    <button class="btn-cancel" id="cancelDateRange">Cancel</button>
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(modal);
-        
-        // Apply button
-        document.getElementById('applyDateRange').addEventListener('click', () => {
-            const start = document.getElementById('modalStartDate').value;
-            const end = document.getElementById('modalEndDate').value;
+        const startPrompt = prompt('Enter start date (YYYY-MM-DD):', currentStart);
+        if (startPrompt !== null) {
+            startDateInput.value = startPrompt;
             
-            startDateInput.value = start;
-            endDateInput.value = end;
-            
-            if (start && end) {
-                dateRangeInput.value = `${start} to ${end}`;
-            } else if (start) {
-                dateRangeInput.value = `From ${start}`;
-            } else if (end) {
-                dateRangeInput.value = `Until ${end}`;
-            } else {
-                dateRangeInput.value = '';
+            const endPrompt = prompt('Enter end date (YYYY-MM-DD):', currentEnd);
+            if (endPrompt !== null) {
+                endDateInput.value = endPrompt;
+                
+                if (startPrompt && endPrompt) {
+                    dateRangeInput.value = `${startPrompt} to ${endPrompt}`;
+                } else if (startPrompt) {
+                    dateRangeInput.value = `From ${startPrompt}`;
+                } else if (endPrompt) {
+                    dateRangeInput.value = `Until ${endPrompt}`;
+                }
+                
+                applyFilters();
             }
-            
-            applyFilters();
-            document.body.removeChild(modal);
-        });
-        
-        // Clear button
-        document.getElementById('clearDateRange').addEventListener('click', () => {
-            startDateInput.value = '';
-            endDateInput.value = '';
-            dateRangeInput.value = '';
-            applyFilters();
-            document.body.removeChild(modal);
-        });
-        
-        // Cancel button
-        document.getElementById('cancelDateRange').addEventListener('click', () => {
-            document.body.removeChild(modal);
-        });
-        
-        // Close on outside click
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                document.body.removeChild(modal);
-            }
-        });
+        }
     });
     
     // Filter listeners

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard Verification</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        h2 { margin-top: 0; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Dashboard Verification Report</h1>
+    <div id="output"></div>
+    
+    <script src="script.js"></script>
+    <script>
+        setTimeout(async () => {
+            const output = document.getElementById('output');
+            let html = '';
+            
+            try {
+                // Test 1: Data Loading
+                html += '<div class="section success"><h2>✅ Test 1: Data Loading</h2>';
+                html += `<p>Total rows loaded: ${allData.length}</p>`;
+                html += `<p>Filtered rows: ${filteredData.length}</p></div>`;
+                
+                // Test 2: Approval Status
+                const pending = filteredData.filter(o => o['Approval Status']?.trim() === 'Pending').length;
+                const verified = filteredData.filter(o => o['Approval Status']?.trim() === 'Verified').length;
+                const rejected = filteredData.filter(o => o['Approval Status']?.trim() === 'Rejected').length;
+                
+                html += '<div class="section success"><h2>✅ Test 2: Approval Status Counts</h2>';
+                html += `<p>Pending: ${pending}</p>`;
+                html += `<p>Verified: ${verified}</p>`;
+                html += `<p>Rejected: ${rejected}</p></div>`;
+                
+                // Test 3: Product Extraction
+                const sample = allData[0];
+                const prodName = extractProductName(sample['Product Name 1']);
+                const cashback = extractCashbackAmount(sample['Product Name 1']);
+                
+                html += '<div class="section success"><h2>✅ Test 3: Product Extraction</h2>';
+                html += `<p>Sample Product String: ${sample['Product Name 1']?.substring(0, 50)}...</p>`;
+                html += `<p>Extracted Product Name: ${prodName}</p>`;
+                html += `<p>Extracted Cashback: ₹${cashback}</p></div>`;
+                
+                // Test 4: Farmer Totals
+                const farmerTotals = calculateFarmerTotals();
+                const totalFarmers = Object.keys(farmerTotals).length;
+                const eligibleFarmers = Object.values(farmerTotals).filter(f => f.verifiedValue >= 10000).length;
+                
+                html += '<div class="section success"><h2>✅ Test 4: Farmer Aggregation</h2>';
+                html += `<p>Total unique farmers: ${totalFarmers}</p>`;
+                html += `<p>Farmers eligible for cashback (≥₹10,000): ${eligibleFarmers}</p>`;
+                html += `<p>Sample farmer data:</p><pre>${JSON.stringify(Object.values(farmerTotals)[0], null, 2)}</pre></div>`;
+                
+                // Test 5: Cashback Calculation
+                let totalCashback = 0;
+                const winnersSet = new Set();
+                filteredData.forEach(order => {
+                    const farmerMobile = order['Farmer Mobile'];
+                    const farmerVerifiedTotal = farmerTotals[farmerMobile]?.verifiedValue || 0;
+                    const cashback = calculateOrderCashback(order, farmerVerifiedTotal);
+                    if (cashback > 0) {
+                        winnersSet.add(farmerMobile);
+                        totalCashback += cashback;
+                    }
+                });
+                
+                html += '<div class="section success"><h2>✅ Test 5: Cashback Calculation</h2>';
+                html += `<p>Total cashback winners: ${winnersSet.size}</p>`;
+                html += `<p>Total cashback amount: ₹${Math.round(totalCashback).toLocaleString('en-IN')}</p></div>`;
+                
+                // Test 6: Product Sales
+                const sales = getProductSales();
+                html += '<div class="section success"><h2>✅ Test 6: Product-wise Sales</h2>';
+                Object.keys(sales).forEach(product => {
+                    html += `<p>${product}: ${sales[product].units} units, ₹${Math.round(sales[product].cashback).toLocaleString('en-IN')} cashback</p>`;
+                });
+                html += '</div>';
+                
+            } catch (error) {
+                html += `<div class="section error"><h2>❌ Error</h2><p>${error.message}</p><pre>${error.stack}</pre></div>`;
+            }
+            
+            output.innerHTML = html;
+        }, 2000);
+    </script>
+</body>
+</html>
