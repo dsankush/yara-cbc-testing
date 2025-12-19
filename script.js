@@ -2,6 +2,8 @@
 let allData = [];
 let filteredData = [];
 let charts = {};
+let indiaMapInstance = null;
+let mapMarkers = [];
 
 // Product configuration with pricing and cashback info
 const PRODUCT_CONFIG = {
@@ -39,14 +41,27 @@ const PRODUCT_CONFIG = {
 
 const CASHBACK_THRESHOLD = 10000;
 
+// Approximate coordinates for Uttar Pradesh districts
+const UP_DISTRICTS_COORDS = {
+    'Agra': [27.1767, 78.0081],
+    'Aligarh': [27.8974, 78.0880],
+    'Amroha': [28.9034, 78.4671],
+    'Moradabad': [28.8389, 78.7378],
+    'Bareilly': [28.3670, 79.4304],
+    'Meerut': [28.9845, 77.7064],
+    'Ghaziabad': [28.6692, 77.4538],
+    'Bulandshahr': [28.4055, 77.8483],
+    'Gautam Buddha Nagar': [28.3587, 77.5349],
+    'Noida': [28.3587, 77.5349]
+};
+
 // ===== Utility Functions =====
 function parseCSV(csvText) {
-    const lines = csvText.split('\n');
+    const lines = csvText.trim().split('\n');
     const headers = lines[0].split(',').map(h => h.trim());
     const data = [];
     
-    let i = 1;
-    while (i < lines.length) {
+    for (let i = 1; i < lines.length; i++) {
         let currentLine = lines[i];
         let row = [];
         let inQuotes = false;
@@ -94,8 +109,6 @@ function parseCSV(csvText) {
             });
             data.push(rowData);
         }
-        
-        i++;
     }
     
     return data;
@@ -104,9 +117,18 @@ function parseCSV(csvText) {
 function extractProductName(productString) {
     if (!productString) return '';
     
-    // Extract product name before "Cashback Amount"
-    const match = productString.match(/^(.*?)\s*(?:Cashback Amount|$)/);
-    return match ? match[1].trim() : productString.trim();
+    // Remove quotes and extract product name before "Cashback Amount"
+    const cleanString = productString.replace(/^["']|["']$/g, '').trim();
+    const match = cleanString.match(/^(.*?)\s*(?:Cashback Amount|$)/i);
+    return match ? match[1].trim() : cleanString;
+}
+
+function extractCashbackAmount(productString) {
+    if (!productString) return 0;
+    
+    // Extract cashback amount from the string like "YaraLiva Nitrabor \n Cashback Amount : ₹25"
+    const match = productString.match(/Cashback Amount\s*[:：]\s*₹?(\d+)/i);
+    return match ? parseInt(match[1]) : 0;
 }
 
 function parseDate(dateString) {
@@ -125,11 +147,11 @@ function parseDate(dateString) {
 }
 
 function formatCurrency(amount) {
-    return '₹' + amount.toLocaleString('en-IN');
+    return '₹' + Math.round(amount).toLocaleString('en-IN');
 }
 
 function formatNumber(num) {
-    return num.toLocaleString('en-IN');
+    return Math.round(num).toLocaleString('en-IN');
 }
 
 // ===== Data Processing Functions =====
@@ -137,33 +159,80 @@ function calculateOrderValue(order) {
     let totalValue = 0;
     
     for (let i = 1; i <= 5; i++) {
-        const productName = extractProductName(order[`Product Name ${i}`]);
+        const productString = order[`Product Name ${i}`];
         const quantity = parseInt(order[`Product Quantity ${i}`]) || 0;
         
-        if (productName && PRODUCT_CONFIG[productName]) {
-            totalValue += PRODUCT_CONFIG[productName].price * quantity;
+        if (productString && quantity > 0) {
+            const productName = extractProductName(productString);
+            
+            if (PRODUCT_CONFIG[productName]) {
+                totalValue += PRODUCT_CONFIG[productName].price * quantity;
+            }
         }
     }
     
     return totalValue;
 }
 
-function calculateOrderCashback(order) {
-    const orderValue = calculateOrderValue(order);
+function calculateFarmerTotals() {
+    const farmerTotals = {};
     
-    // Only eligible if order value >= 10000 and status is Verified
-    if (orderValue < CASHBACK_THRESHOLD || order['Approval Status'] !== 'Verified') {
+    // First pass: calculate total verified value per farmer
+    filteredData.forEach(order => {
+        const farmerMobile = order['Farmer Mobile'];
+        const isVerified = order['Approval Status']?.trim() === 'Verified';
+        
+        if (!farmerMobile) return;
+        
+        if (!farmerTotals[farmerMobile]) {
+            farmerTotals[farmerMobile] = {
+                totalValue: 0,
+                verifiedValue: 0,
+                orders: [],
+                verifiedOrders: 0
+            };
+        }
+        
+        const orderValue = calculateOrderValue(order);
+        farmerTotals[farmerMobile].totalValue += orderValue;
+        farmerTotals[farmerMobile].orders.push(order);
+        
+        if (isVerified) {
+            farmerTotals[farmerMobile].verifiedValue += orderValue;
+            farmerTotals[farmerMobile].verifiedOrders++;
+        }
+    });
+    
+    return farmerTotals;
+}
+
+function calculateOrderCashback(order, farmerVerifiedTotal) {
+    // Only eligible if farmer's total verified value >= 10000 and this order status is Verified
+    const isVerified = order['Approval Status']?.trim() === 'Verified';
+    
+    if (farmerVerifiedTotal < CASHBACK_THRESHOLD || !isVerified) {
         return 0;
     }
     
     let totalCashback = 0;
     
     for (let i = 1; i <= 5; i++) {
-        const productName = extractProductName(order[`Product Name ${i}`]);
+        const productString = order[`Product Name ${i}`];
         const quantity = parseInt(order[`Product Quantity ${i}`]) || 0;
         
-        if (productName && PRODUCT_CONFIG[productName]) {
-            totalCashback += PRODUCT_CONFIG[productName].cashback * quantity;
+        if (productString && quantity > 0) {
+            // Try to extract cashback from the product string first
+            let cashbackPerUnit = extractCashbackAmount(productString);
+            
+            // Fallback to product config if not found in string
+            if (cashbackPerUnit === 0) {
+                const productName = extractProductName(productString);
+                if (PRODUCT_CONFIG[productName]) {
+                    cashbackPerUnit = PRODUCT_CONFIG[productName].cashback;
+                }
+            }
+            
+            totalCashback += cashbackPerUnit * quantity;
         }
     }
     
@@ -177,20 +246,32 @@ function getProductSales() {
         sales[product] = { units: 0, cashback: 0, orders: 0 };
     });
     
+    const farmerTotals = calculateFarmerTotals();
+    
     filteredData.forEach(order => {
-        const orderCashback = calculateOrderCashback(order);
-        const isWinner = orderCashback > 0;
+        const farmerMobile = order['Farmer Mobile'];
+        const farmerVerifiedTotal = farmerTotals[farmerMobile]?.verifiedValue || 0;
+        const orderCashback = calculateOrderCashback(order, farmerVerifiedTotal);
         
         for (let i = 1; i <= 5; i++) {
-            const productName = extractProductName(order[`Product Name ${i}`]);
+            const productString = order[`Product Name ${i}`];
             const quantity = parseInt(order[`Product Quantity ${i}`]) || 0;
             
-            if (productName && sales[productName]) {
-                sales[productName].units += quantity;
-                sales[productName].orders++;
+            if (productString && quantity > 0) {
+                const productName = extractProductName(productString);
                 
-                if (isWinner && PRODUCT_CONFIG[productName]) {
-                    sales[productName].cashback += PRODUCT_CONFIG[productName].cashback * quantity;
+                if (productName && sales[productName]) {
+                    sales[productName].units += quantity;
+                    sales[productName].orders++;
+                    
+                    if (orderCashback > 0) {
+                        // Get cashback for this specific product in this order
+                        let cashbackPerUnit = extractCashbackAmount(productString);
+                        if (cashbackPerUnit === 0 && PRODUCT_CONFIG[productName]) {
+                            cashbackPerUnit = PRODUCT_CONFIG[productName].cashback;
+                        }
+                        sales[productName].cashback += cashbackPerUnit * quantity;
+                    }
                 }
             }
         }
@@ -205,7 +286,6 @@ function getCropAnalysis() {
     filteredData.forEach(order => {
         const crops = order['Crops Selected'];
         if (crops) {
-            // Split by comma and trim
             const cropList = crops.split(',').map(c => c.trim()).filter(c => c);
             cropList.forEach(crop => {
                 cropCounts[crop] = (cropCounts[crop] || 0) + 1;
@@ -218,26 +298,29 @@ function getCropAnalysis() {
 
 function getDistrictAnalysis() {
     const districtData = {};
+    const farmerTotals = calculateFarmerTotals();
     
     filteredData.forEach(order => {
-        const district = order['District'] || 'Unknown';
+        const district = order['District']?.trim() || 'Unknown';
         const farmerMobile = order['Farmer Mobile'];
-        const orderCashback = calculateOrderCashback(order);
-        const isWinner = orderCashback > 0;
+        const farmerVerifiedTotal = farmerTotals[farmerMobile]?.verifiedValue || 0;
+        const orderCashback = calculateOrderCashback(order, farmerVerifiedTotal);
         
         if (!districtData[district]) {
             districtData[district] = {
                 totalFarmers: new Set(),
                 winners: new Set(),
-                orders: 0
+                orders: 0,
+                totalCashback: 0
             };
         }
         
         districtData[district].totalFarmers.add(farmerMobile);
         districtData[district].orders++;
         
-        if (isWinner) {
+        if (orderCashback > 0) {
             districtData[district].winners.add(farmerMobile);
+            districtData[district].totalCashback += orderCashback;
         }
     });
     
@@ -257,7 +340,9 @@ function getRetailerAnalysis() {
         const rin = order['RIN'];
         const retailerName = order['Retailer Name'];
         const farmerMobile = order['Farmer Mobile'];
-        const status = order['Approval Status'];
+        const status = order['Approval Status']?.trim();
+        
+        if (!rin) return;
         
         if (!retailerData[rin]) {
             retailerData[rin] = {
@@ -294,7 +379,7 @@ function getRetailerAnalysis() {
         verificationRate: (retailerData[rin].verified / retailerData[rin].orders * 100).toFixed(1)
     }));
     
-    // Sort by orders
+    // Sort by orders descending
     retailers.sort((a, b) => b.orders - a.orders);
     
     return retailers;
@@ -306,26 +391,30 @@ function updateKeyMetrics() {
     document.getElementById('totalScans').textContent = formatNumber(filteredData.length);
     
     // Unique farmers
-    const uniqueFarmers = new Set(filteredData.map(o => o['Farmer Mobile'])).size;
+    const uniqueFarmers = new Set(filteredData.map(o => o['Farmer Mobile']).filter(m => m)).size;
     document.getElementById('uniqueFarmers').textContent = formatNumber(uniqueFarmers);
     
-    // Status counts
-    const pending = filteredData.filter(o => o['Approval Status'] === 'Pending').length;
-    const verified = filteredData.filter(o => o['Approval Status'] === 'Verified').length;
-    const rejected = filteredData.filter(o => o['Approval Status'] === 'Rejected').length;
+    // Status counts - DIRECTLY from Approval Status column
+    const pending = filteredData.filter(o => o['Approval Status']?.trim() === 'Pending').length;
+    const verified = filteredData.filter(o => o['Approval Status']?.trim() === 'Verified').length;
+    const rejected = filteredData.filter(o => o['Approval Status']?.trim() === 'Rejected').length;
     
     document.getElementById('pendingCount').textContent = formatNumber(pending);
     document.getElementById('verifiedCount').textContent = formatNumber(verified);
     document.getElementById('rejectedCount').textContent = formatNumber(rejected);
     
-    // Cashback winners
+    // Cashback winners - Calculate per farmer with total verified amount >= 10000
+    const farmerTotals = calculateFarmerTotals();
     const winnersSet = new Set();
     let totalCashback = 0;
     
     filteredData.forEach(order => {
-        const cashback = calculateOrderCashback(order);
+        const farmerMobile = order['Farmer Mobile'];
+        const farmerVerifiedTotal = farmerTotals[farmerMobile]?.verifiedValue || 0;
+        const cashback = calculateOrderCashback(order, farmerVerifiedTotal);
+        
         if (cashback > 0) {
-            winnersSet.add(order['Farmer Mobile']);
+            winnersSet.add(farmerMobile);
             totalCashback += cashback;
         }
     });
@@ -334,7 +423,7 @@ function updateKeyMetrics() {
     document.getElementById('totalCashback').textContent = formatCurrency(totalCashback);
     
     // Active retailers
-    const activeRetailers = new Set(filteredData.map(o => o['RIN'])).size;
+    const activeRetailers = new Set(filteredData.map(o => o['RIN']).filter(r => r)).size;
     document.getElementById('activeRetailers').textContent = formatNumber(activeRetailers);
 }
 
@@ -455,9 +544,9 @@ function updateCashbackChart() {
 }
 
 function updateStatusPieChart() {
-    const pending = filteredData.filter(o => o['Approval Status'] === 'Pending').length;
-    const verified = filteredData.filter(o => o['Approval Status'] === 'Verified').length;
-    const rejected = filteredData.filter(o => o['Approval Status'] === 'Rejected').length;
+    const pending = filteredData.filter(o => o['Approval Status']?.trim() === 'Pending').length;
+    const verified = filteredData.filter(o => o['Approval Status']?.trim() === 'Verified').length;
+    const rejected = filteredData.filter(o => o['Approval Status']?.trim() === 'Rejected').length;
     
     const ctx = document.getElementById('statusPieChart').getContext('2d');
     
@@ -491,7 +580,7 @@ function updateStatusPieChart() {
                     callbacks: {
                         label: function(context) {
                             const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((context.parsed / total) * 100).toFixed(1);
+                            const percentage = total > 0 ? ((context.parsed / total) * 100).toFixed(1) : 0;
                             return context.label + ': ' + formatNumber(context.parsed) + ' (' + percentage + '%)';
                         }
                     }
@@ -557,7 +646,7 @@ function updateCropChart() {
 function updateDistrictChart() {
     const districtAnalysis = getDistrictAnalysis();
     const districts = Object.keys(districtAnalysis)
-        .filter(d => d !== 'Unknown')
+        .filter(d => d !== 'Unknown' && d !== '')
         .sort((a, b) => districtAnalysis[b].totalFarmersCount - districtAnalysis[a].totalFarmersCount)
         .slice(0, 10);
     
@@ -709,6 +798,133 @@ function updateDistrictMap() {
     }).join('');
 }
 
+// ===== India Map with Leaflet =====
+function initializeIndiaMap() {
+    const mapElement = document.getElementById('indiaMap');
+    if (!mapElement) {
+        console.error('Map element not found');
+        return;
+    }
+    
+    if (indiaMapInstance) {
+        indiaMapInstance.remove();
+        indiaMapInstance = null;
+    }
+    
+    try {
+        // Initialize map centered on Uttar Pradesh
+        indiaMapInstance = L.map('indiaMap').setView([27.0, 80.0], 7);
+        
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 18,
+            minZoom: 6
+        }).addTo(indiaMapInstance);
+        
+        // Add custom styling to map
+        mapElement.style.border = '2px solid #00695f';
+        mapElement.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+        
+        console.log('Map initialized successfully');
+    } catch (error) {
+        console.error('Error initializing map:', error);
+    }
+}
+
+function updateIndiaMap() {
+    if (!indiaMapInstance) {
+        initializeIndiaMap();
+        // Wait a bit for map to initialize
+        setTimeout(updateIndiaMap, 500);
+        return;
+    }
+    
+    // Clear existing markers
+    mapMarkers.forEach(marker => {
+        try {
+            marker.remove();
+        } catch (e) {
+            console.error('Error removing marker:', e);
+        }
+    });
+    mapMarkers = [];
+    
+    const districtAnalysis = getDistrictAnalysis();
+    
+    // Find max winners for scaling
+    const maxWinners = Math.max(...Object.values(districtAnalysis).map(d => d.winnersCount), 1);
+    
+    Object.keys(districtAnalysis).forEach(district => {
+        const coords = UP_DISTRICTS_COORDS[district];
+        if (!coords) return;
+        
+        const data = districtAnalysis[district];
+        const winnersCount = data.winnersCount;
+        const totalFarmers = data.totalFarmersCount;
+        const totalCashback = data.totalCashback || 0;
+        
+        // Scale marker size based on winners count
+        const baseSize = 10;
+        const maxSize = 40;
+        const size = baseSize + (winnersCount / maxWinners) * (maxSize - baseSize);
+        
+        // Color based on activity level
+        let color = '#b2dfdb'; // Low
+        if (winnersCount > maxWinners * 0.6) {
+            color = '#00695f'; // High
+        } else if (winnersCount > maxWinners * 0.3) {
+            color = '#4db6ac'; // Medium
+        }
+        
+        try {
+            // Create circle marker
+            const marker = L.circleMarker(coords, {
+                radius: size / 2,
+                fillColor: color,
+                color: '#ffffff',
+                weight: 2,
+                opacity: 1,
+                fillOpacity: 0.8
+            }).addTo(indiaMapInstance);
+            
+            // Create popup content
+            const popupContent = `
+                <div style="font-family: 'Segoe UI', sans-serif; padding: 8px;">
+                    <h4 style="margin: 0 0 8px 0; color: #00695f; font-size: 1.1rem;">${district}</h4>
+                    <div style="font-size: 0.9rem;">
+                        <p style="margin: 4px 0;"><strong>Total Farmers:</strong> ${formatNumber(totalFarmers)}</p>
+                        <p style="margin: 4px 0; color: #00695f;"><strong>Cashback Winners:</strong> ${formatNumber(winnersCount)}</p>
+                        <p style="margin: 4px 0;"><strong>Total Orders:</strong> ${formatNumber(data.orders)}</p>
+                        <p style="margin: 4px 0; color: #ff9800;"><strong>Total Cashback:</strong> ${formatCurrency(totalCashback)}</p>
+                    </div>
+                </div>
+            `;
+            
+            marker.bindPopup(popupContent);
+            
+            // Add hover effect
+            marker.on('mouseover', function() {
+                this.setStyle({
+                    radius: size / 2 + 3,
+                    fillOpacity: 1
+                });
+            });
+            
+            marker.on('mouseout', function() {
+                this.setStyle({
+                    radius: size / 2,
+                    fillOpacity: 0.8
+                });
+            });
+            
+            mapMarkers.push(marker);
+        } catch (error) {
+            console.error('Error creating marker for', district, ':', error);
+        }
+    });
+}
+
 function updateAllCharts() {
     updateKeyMetrics();
     updateProductUnitsChart();
@@ -719,6 +935,7 @@ function updateAllCharts() {
     updateBudgetTracking();
     updateTopRetailersTable();
     updateDistrictMap();
+    updateIndiaMap();
 }
 
 // ===== Filter Functions =====
@@ -777,6 +994,7 @@ function applyFilters() {
     const startDate = document.getElementById('startDate').value;
     const endDate = document.getElementById('endDate').value;
     const district = document.getElementById('districtFilter').value;
+    const landAcreage = document.getElementById('landAcreageFilter').value;
     const crop = document.getElementById('cropFilter').value;
     const product = document.getElementById('productFilter').value;
     const retailer = document.getElementById('retailerFilter').value;
@@ -807,8 +1025,18 @@ function applyFilters() {
         }
         
         // District filter
-        if (district && order['District'] !== district) {
+        if (district && order['District']?.trim() !== district) {
             return false;
+        }
+        
+        // Land Acreage filter
+        if (landAcreage) {
+            const acreage = parseFloat(order['Land Acreage']) || 0;
+            
+            if (landAcreage === '0-5' && (acreage < 0 || acreage > 5)) return false;
+            if (landAcreage === '5-10' && (acreage < 5 || acreage > 10)) return false;
+            if (landAcreage === '10-25' && (acreage < 10 || acreage > 25)) return false;
+            if (landAcreage === '25+' && acreage < 25) return false;
         }
         
         // Crop filter
@@ -843,71 +1071,15 @@ function applyFilters() {
     });
     
     updateAllCharts();
-    updateCascadingFilters();
-}
-
-function updateCascadingFilters() {
-    // This function updates filter options based on current selection
-    // Implementing reverse cascading - each filter affects others
-    
-    const currentFilters = {
-        district: document.getElementById('districtFilter').value,
-        crop: document.getElementById('cropFilter').value,
-        product: document.getElementById('productFilter').value,
-        retailer: document.getElementById('retailerFilter').value
-    };
-    
-    // Get available options from filtered data
-    const availableDistricts = new Set(filteredData.map(o => o['District']).filter(d => d));
-    const availableCrops = new Set();
-    const availableProducts = new Set();
-    const availableRetailers = new Set(filteredData.map(o => o['Retailer Name']).filter(r => r));
-    
-    filteredData.forEach(order => {
-        // Crops
-        const crops = order['Crops Selected'];
-        if (crops) {
-            crops.split(',').map(c => c.trim()).filter(c => c).forEach(crop => availableCrops.add(crop));
-        }
-        
-        // Products
-        for (let i = 1; i <= 5; i++) {
-            const productName = extractProductName(order[`Product Name ${i}`]);
-            if (productName && PRODUCT_CONFIG[productName]) {
-                availableProducts.add(productName);
-            }
-        }
-    });
-    
-    // Update filter dropdowns while preserving current selection
-    updateFilterOptions('districtFilter', availableDistricts, currentFilters.district);
-    updateFilterOptions('cropFilter', availableCrops, currentFilters.crop);
-    updateFilterOptions('productFilter', availableProducts, currentFilters.product);
-    updateFilterOptions('retailerFilter', availableRetailers, currentFilters.retailer);
-}
-
-function updateFilterOptions(filterId, availableOptions, currentValue) {
-    const select = document.getElementById(filterId);
-    const options = Array.from(select.options);
-    
-    options.forEach(option => {
-        if (option.value === '') return; // Keep "All" option
-        
-        if (availableOptions.has(option.value)) {
-            option.disabled = false;
-            option.style.display = '';
-        } else {
-            option.disabled = true;
-            option.style.display = 'none';
-        }
-    });
 }
 
 function resetFilters() {
     document.getElementById('universalSearch').value = '';
     document.getElementById('startDate').value = '';
     document.getElementById('endDate').value = '';
+    document.getElementById('dateRangeFilter').value = '';
     document.getElementById('districtFilter').value = '';
+    document.getElementById('landAcreageFilter').value = '';
     document.getElementById('cropFilter').value = '';
     document.getElementById('productFilter').value = '';
     document.getElementById('retailerFilter').value = '';
@@ -916,18 +1088,21 @@ function resetFilters() {
     
     filteredData = [...allData];
     updateAllCharts();
-    populateFilters(); // Re-enable all options
 }
 
 // ===== Download Function =====
 function downloadReport() {
     // Create CSV content
     let csv = 'Order ID,Date of Entry,RIN,Retailer Name,Farmer Name,Farmer Mobile,District,Crops Selected,';
-    csv += 'Approval Status,Order Value,Cashback Amount,Is Winner\n';
+    csv += 'Approval Status,Order Value,Farmer Total Verified,Cashback Amount,Is Winner\n';
+    
+    const farmerTotals = calculateFarmerTotals();
     
     filteredData.forEach(order => {
+        const farmerMobile = order['Farmer Mobile'];
+        const farmerVerifiedTotal = farmerTotals[farmerMobile]?.verifiedValue || 0;
         const orderValue = calculateOrderValue(order);
-        const cashback = calculateOrderCashback(order);
+        const cashback = calculateOrderCashback(order, farmerVerifiedTotal);
         const isWinner = cashback > 0 ? 'Yes' : 'No';
         
         csv += `${order['Order ID']},`;
@@ -940,6 +1115,7 @@ function downloadReport() {
         csv += `"${order['Crops Selected']}",`;
         csv += `${order['Approval Status']},`;
         csv += `${orderValue},`;
+        csv += `${farmerVerifiedTotal},`;
         csv += `${cashback},`;
         csv += `${isWinner}\n`;
     });
@@ -972,11 +1148,19 @@ async function initDashboard() {
         allData = parseCSV(csvText);
         filteredData = [...allData];
         
+        console.log('Data loaded:', allData.length, 'rows');
+        
         // Populate filters
         populateFilters();
         
         // Update dashboard
         updateAllCharts();
+        
+        // Initialize map after a short delay to ensure DOM is ready
+        setTimeout(() => {
+            initializeIndiaMap();
+            updateIndiaMap();
+        }, 1000);
         
         // Update last updated time
         document.getElementById('lastUpdated').textContent = new Date().toLocaleString();
@@ -989,6 +1173,7 @@ async function initDashboard() {
     } catch (error) {
         console.error('Error initializing dashboard:', error);
         alert('Error loading dashboard data. Please check the console for details.');
+        document.getElementById('loadingOverlay').classList.add('hidden');
     }
 }
 
@@ -1021,10 +1206,39 @@ document.addEventListener('DOMContentLoaded', () => {
         applyFilters();
     });
     
+    // Date Range functionality - simple version
+    const dateRangeInput = document.getElementById('dateRangeFilter');
+    const startDateInput = document.getElementById('startDate');
+    const endDateInput = document.getElementById('endDate');
+    
+    dateRangeInput.addEventListener('click', function() {
+        const currentStart = startDateInput.value;
+        const currentEnd = endDateInput.value;
+        
+        const startPrompt = prompt('Enter start date (YYYY-MM-DD):', currentStart);
+        if (startPrompt !== null) {
+            startDateInput.value = startPrompt;
+            
+            const endPrompt = prompt('Enter end date (YYYY-MM-DD):', currentEnd);
+            if (endPrompt !== null) {
+                endDateInput.value = endPrompt;
+                
+                if (startPrompt && endPrompt) {
+                    dateRangeInput.value = `${startPrompt} to ${endPrompt}`;
+                } else if (startPrompt) {
+                    dateRangeInput.value = `From ${startPrompt}`;
+                } else if (endPrompt) {
+                    dateRangeInput.value = `Until ${endPrompt}`;
+                }
+                
+                applyFilters();
+            }
+        }
+    });
+    
     // Filter listeners
-    document.getElementById('startDate').addEventListener('change', applyFilters);
-    document.getElementById('endDate').addEventListener('change', applyFilters);
     document.getElementById('districtFilter').addEventListener('change', applyFilters);
+    document.getElementById('landAcreageFilter').addEventListener('change', applyFilters);
     document.getElementById('cropFilter').addEventListener('change', applyFilters);
     document.getElementById('productFilter').addEventListener('change', applyFilters);
     document.getElementById('retailerFilter').addEventListener('change', applyFilters);
